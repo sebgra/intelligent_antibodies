@@ -20,3 +20,19 @@ More criteria can be applied to select data from [here](https://opig.stats.ox.ac
 
 
 Backup data can be found [here](https://github.com/mit-ll/AlphaSeq_Antibody_Dataset)
+
+## Covid data
+
+[Here](https://opig.stats.ox.ac.uk/webapps/covabdab/)
+
+# Resources
+
+[Article](https://www.sciencedirect.com/science/article/pii/S1093326322002431)
+
+
+[Benchmark](https://github.com/piercelab/antibody_benchmark)
+
+
+[Siamese Network](https://github.com/emersON106/AbAgIntPre)
+https://www.frontiersin.org/journals/immunology/articles/10.3389/fimmu.2022.1053617/full#h6x
+
