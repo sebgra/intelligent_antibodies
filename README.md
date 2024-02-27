@@ -36,3 +36,8 @@ Backup data can be found [here](https://github.com/mit-ll/AlphaSeq_Antibody_Data
 [Siamese Network](https://github.com/emersON106/AbAgIntPre)
 https://www.frontiersin.org/journals/immunology/articles/10.3389/fimmu.2022.1053617/full#h6x
 
+# Data
+https://github.com/emersON106/AbAgIntPre/tree/main
+
+ - Get this [data](https://github.com/emersON106/AbAgIntPre/tree/main/SAbDab) to have all the usefull PDBs, then collect all the corresponding fasta files.
+ - Parse all the Fasta grepping "heavy chain", "light chain", "antibody", "antigene" to create dataset of sequences for both Ag and Ab.
