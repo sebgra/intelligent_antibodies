@@ -9,12 +9,22 @@ test_url = "http://opig.stats.ox.ac.uk/webapps/newsabdab/sabdab/summary/summary.
 root_url = "https://www.rcsb.org/fasta/entry"
 
 def fetch_fasta(pdb_id):
-    with urllib.request.urlopen(f"{root_url}/{pdb_id.upper()}") as response:
-        html = response.read()
-        content = html.decode('utf-8')
+    unfetched = open('data/SAbDab/unfetched.txt', 'w')
 
-        with open(f'data/SAbDab/fasta/all_samples/{pdb_id}.fasta', 'w') as f:
-            f.write(content)
+    try:
+        with urllib.request.urlopen(f"{root_url}/{pdb_id.upper()}") as response:
+            html = response.read()
+            content = html.decode('utf-8')
+
+            with open(f'data/SAbDab/fasta/all_samples/{pdb_id}.fasta', 'w') as f:
+                f.write(content)
+
+    except:
+        print(f'Failed to fetch {pdb_id}')
+        unfetched.write(pdb_id)
+
+    unfetched.close()
+        
 
     return None
 
