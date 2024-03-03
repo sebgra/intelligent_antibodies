@@ -6,6 +6,8 @@ from Bio import SeqIO
 ab_prefixes = ["IMMUNOGLOBULIN", "scFv", "Fab", "HEAVY CHAIN", "LIGHT CHAIN",
                "heavy chain", "light chain","ANTIBODY", "SCFV", "FAB"]
 
+
+
 fasta_sequences = SeqIO.parse(open("data/SAbDab/fasta/all_samples/1oaz.fasta"),'fasta')
 for fasta in fasta_sequences:
     print(fasta)

@@ -2,6 +2,10 @@ import os
 import urllib.request
 import pandas as pd
 
+"""
+Fetch the fasta files for the proteins and complexes in the SAbDab database.
+Data is fetched from the RCSB PDB database and stored in the data/SAbDab/fasta folder.
+"""
 
 root_url = "https://www.rcsb.org/fasta/entry"
 

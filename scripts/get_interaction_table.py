@@ -4,7 +4,13 @@ import pandas as pd
 import numpy
 from Bio import SeqIO
 
-
+"""
+Extracts interaction type from the positive samples and all pdb ids.
+Write a table with the following columns:
+- ab: pdb id of the antibody
+- ag: pdb id of the antigen
+- interaction: 1 if the couple is in the positive samples, 0 otherwise
+"""
 
 
 
