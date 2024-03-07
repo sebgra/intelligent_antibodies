@@ -63,9 +63,44 @@ python download_pdb.py
 
 All fasta files will be saved in _./data/SabDab/fasta_ folder.
 
-To get the interaction table ...
+To get the interaction table use : 
 
-To have the sequences table ...
+```
+python get_interaction_table.py
+```
+
+This will create _data.csv_ a three column tabular file containing antibody identifier, antigen identifier and 0/1 depending on the ability to form immune complexes. Identifiers are supplemented wit _|ag_ or _|ab_ to refer to the antigenic or antiboy part of the complex.
+
+The data look like : 
+
+```
+ab;ag;interaction
+5kel|ab;5kel|ag;1
+5kel|ab;6cwt|ag;0
+...
+```
+
+To have the sequences table use :
+
+```
+python get_seq_table.py
+```
+
+This will create _sequences_.csv_ a three column tabular file containing extended identifier such as _abcd|ag_ or _abcd|ab_, the species from where it comes and the chain of residues.
+
+```
+seq_id;specie;sequence
+5kel|ag;Zaire ebolavirus (strain Mayinga-76) (128952);IPLGVIHNSTLQVSDVDKLVCRDKLSSTNQLRSVGLNLEGNGVATDVPSATKRWGFRSGVPPKVVNYEAGEWAENCYNLEIKKPDGSECLPAAPDGIRGFPRCRYVHKVSGTGPCAGDFAFHKEGAFFLYDRLASTVIYRGTTFAEGVVAFLILPQAKKDFFSSHPLREPVNATEDPSSGYYSTTIRYQATGFGTNETEYLFEVDNLTYVQLESRFTPQFLLQLNETIYTSGKRSNTTGKLIWKVNPEIDTTIGEWAFWETKKNLTRKIRSEELSFTVVSNGAKNISGQSPARTSSDPGTNTTTEDHKIMASENSSAMVQVHSQGREAAVSHLTTLATISTSPQSLTTKPGPDNSTHNTPVYKLDISEATQVEQHHRRTDNDSTASDTPSATTAAGPPKAENTNTSKSTDFLDPATTTSPQNHSETAGNNNTHHQDTGEESASSGKLGLITNTIAGVAGLITGGRRTRR
+5kel|ag;Zaire ebolavirus (128952);EAIVNAQPKCNPNLHYWTTQDEGAAIGLAWIPYFGPAAEGIYTEGLMHNQDGLICGLRQLANETTQALQLFLRATTELRTFSILNRKAIDFLLQRWGGTCHILGPDCCIEPHDWTKNITDKIDQIIHDFVDKTLPDLEVDDDD
+...
+```
+
+# Strategy
+
+## Data encoding
+
+
+## Neural networks
 
 ## Draft
 
