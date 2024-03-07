@@ -34,8 +34,8 @@ if __name__ == "__main__":
 
     all_pdb_ids = open('data/SAbDab/All_PDB_files.txt', 'r')
 
-
     with open('./data/SAbDab/sequences.csv', 'w') as f:
+        f.write("seq_id;specie;sequence\n")
 
         for pdb_id in all_pdb_ids:
             fasta_sequences = SeqIO.parse(open(f"data/SAbDab/fasta/all_samples/{get_pdb_id(pdb_id)}.fasta"),'fasta')
