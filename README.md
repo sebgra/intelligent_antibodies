@@ -99,6 +99,7 @@ seq_id;specie;sequence
 
 ## Data encoding
 
+https://dmnfarrell.github.io/bioinformatics/mhclearning
 
 ## Neural networks
 
