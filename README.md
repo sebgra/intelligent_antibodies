@@ -101,6 +101,8 @@ seq_id;specie;sequence
 
 https://dmnfarrell.github.io/bioinformatics/mhclearning
 
+https://computational-discovery-on-jupyter.github.io/Computational-Discovery-on-Jupyter/Contents/chaos-game-representation.html - CGR
+
 ## Neural networks
 
 ## Draft

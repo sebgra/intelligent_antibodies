@@ -2,26 +2,37 @@ import os
 import sys
 from Bio import SeqIO
 
-# # TODO: Add all the prefixes for the antibodies
-ab_prefixes = ["IMMUNOGLOBULIN", "scFv", "Fab", "HEAVY CHAIN", "LIGHT CHAIN",
-               "heavy chain", "light chain","ANTIBODY", "SCFV", "FAB"]
+import pandas as pd
+import numpy as np
+from tqdm import tqdm
+from itertools import combinations_with_replacement,permutations
+ramino = 'ARNDCQEGHILKMFPSTWYV'
+amino = 'ARNDCQEGHILKMFPSTWYVX'
+aminos = []
+for i in amino:
+    for j in amino:
+        aminos.append(i+j)
+# aminos = list(permutations(amino,2))+list(combinations_with_replacement(amino,2))
+# aminos = sorted(set(aminos))
+seq_dict ={j:(i+1) for i,j in enumerate(aminos)}
+print(seq_dict)
+
+def encode(mhc,pep):
+    pep = pep[:20]
+    arr = np.zeros([34,20])
+    for a,m in enumerate(mhc):
+        for b,p in enumerate(pep):
+            if m in ramino and p in ramino:
+                arr[a][b] = seq_dict[m+p]
+            if m in ramino and p not in ramino:
+                arr[a][b] = seq_dict[m+'X']
+            if m not in ramino and p in ramino:
+                arr[a][b] = seq_dict['X'+p]
+    return arr
 
 
-
-fasta_sequences = SeqIO.parse(open("data/SAbDab/fasta/all_samples/1oaz.fasta"),'fasta')
-for fasta in fasta_sequences:
-    print(fasta)
-    description, name, sequence = fasta.description, fasta.id, str(fasta.seq)
-    print(name, sequence)
+test_ag = 'DIVLTQSPATLSVTPGNSVSLSCRASQSIGNNLHWYQQKSHESPRL'
+test_ab = 'VFGRCELAAAMKRHGLDNYRGYSLGNWVCAAKFESNFNTQATNRNTDGSTDYGILQINSRWW'
 
 
-name, chains, molecule, specie = description.split('|')
-print(f"Name: {name}")
-print(f"Chains: {chains}")
-print(f"Molecule: {molecule}")
-print(f"Specie: {specie}")
-
-for prefix in ab_prefixes:
-    if prefix in molecule:
-        print(f"Found Ab in {name}")
-        break
+print(encode(test_ag,test_ab))
