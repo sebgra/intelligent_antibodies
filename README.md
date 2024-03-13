@@ -99,11 +99,39 @@ seq_id;specie;sequence
 
 ## Data encoding
 
-https://dmnfarrell.github.io/bioinformatics/mhclearning
+- Choas Game Representation
 
-https://computational-discovery-on-jupyter.github.io/Computational-Discovery-on-Jupyter/Contents/chaos-game-representation.html - CGR
+    https://dmnfarrell.github.io/bioinformatics/mhclearning
+
+    https://computational-discovery-on-jupyter.github.io/Computational-Discovery-on-Jupyter/Contents/chaos-game-representation.html - CGR
+
+- One Hot
+
+    https://github.com/anazhmetdin/protEncoder/tree/main/protencoder
+
+- k-mers
+
+    https://github.com/anazhmetdin/protEncoder/tree/main/protencoder
+
+- Prot-vec
+
+    https://github.com/anazhmetdin/protEncoder/tree/main/protencoder
+
+- Prot encoder
+
+    https://github.com/anazhmetdin/protEncoder/tree/main/protencoder
 
 ## Neural networks
+
+    https://github.com/sebgra/Tensorflow_Advanced_Specialization/blob/main/C1/week_1/C1_W1_Lab_3_siamese-network.ipynb
+
+- Siamese Network
+
+    https://github.com/sebgra/AI4_Biologist/blob/main/iBio-Summer-School-main/Summer_school_PPI_solved.ipynb
+
+- Double Channel Siamese Network 
+
+    https://bmcgenomics.biomedcentral.com/articles/10.1186/s12864-022-08772-6
 
 ## Draft
 
