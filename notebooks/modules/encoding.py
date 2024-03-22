@@ -20,7 +20,7 @@ def one_hot_encode_sequence(sequence: str, encoder: dict[str, np.ndarray], vecto
         sequence = sequence[:vector_size]
     for i, letter in enumerate(sequence):
         encoded[i] = encoder[letter]
-        return encoded
+    return encoded
 
 def one_hot_encoder(x: str, encoder: dict[str, np.ndarray], vector_size: int=1500):
     x_encode = []
