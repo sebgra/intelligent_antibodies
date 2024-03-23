@@ -14,7 +14,8 @@
     "ngl": "^0.10.4",
     "vue": "^3.4.21",
     "vue-router": "^4.3.0",
-    "vuepython": "^0.0.20"
+    "vuepython": "^0.0.20",
+    "vuex": "^4.1.0"
   },
   "devDependencies": {
     "@vitejs/plugin-vue": "^5.0.4",

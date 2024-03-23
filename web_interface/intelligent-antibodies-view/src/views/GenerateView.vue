@@ -2,7 +2,7 @@
   <div class="generation">
     <div class="input">
       <InputVue 
-        text="Enter an antigene's peptidic sequence"
+        :text="inputText"
         title="Antigene input"
         @updateText="updateText"
         @error="setInputError"
@@ -46,7 +46,8 @@ export default {
         isError:false,
         error:'',
         tableDatas: [],
-        inputError: false
+        inputError: false,
+        inputText: "Enter an antigene's peptidic sequence"
       }
     },
     components: {
@@ -72,6 +73,15 @@ export default {
       },
       getInputError: function() {
         return this.inputError
+      }
+    },
+    mounted() {
+      console.log('mounted', this.$store)
+      if (this.$store.state.antigenesTable.length > 0) {
+        this.tableDatas = this.$store.state.antigenesTable
+      }
+      if (this.$store.state.sequence.length > 0) {
+        this.inputText = this.$store.state.sequence
       }
     },
     methods: {
@@ -111,6 +121,9 @@ export default {
           const res = await api.generate.getGenerateData(this.antigene)
           this.isLoading = false
           this.tableDatas = this.parse_result(res)
+          this.$store.commit('setAntigenesTable', {data:this.tableDatas})
+          this.$store.commit('setSequence', {data:this.antigene})
+          console.log('kept', this.$store.state.antigenesTable)
         } catch (error) {
           this.isLoading = false
           this.error = error
