@@ -44,17 +44,17 @@ class NLFEncoder:
         # If we encounter Selenocysteine, we'll treat it as Cysteine
         self.nlf['U'] = self.nlf['C']
     
-    def encode_sequence(self, sequence: str, vector_size: int=1500) -> np.ndarray:
+    def encode_sequence(self, sequence: str, vector_size) -> np.ndarray:
         sequence = sequence[:vector_size]
         seq_tensor = np.zeros((vector_size, self.nlf.shape[0]), dtype=np.float16)
         for i, letter in enumerate(sequence):
             seq_tensor[i] = self.nlf[letter]
         return seq_tensor
 
-    def encode(self, x):
+    def encode(self, x, vector_size=2000):
         tensors = []
         for sequence in x:
-            tensors.append(self.encode_sequence(sequence))
+            tensors.append(self.encode_sequence(sequence, vector_size))
         return np.array(tensors)
     
 
