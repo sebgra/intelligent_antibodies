@@ -15,7 +15,7 @@ export default {
   },
   methods: {
     launchGen() {
-      console.log("Launching generation")
+      this.$emit('action')
     }
   }
 }

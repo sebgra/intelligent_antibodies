@@ -8,3 +8,7 @@ const app = createApp(App)
 
 app.use(router)
 app.mount('#app')
+
+const cors = require('cors')
+
+app.use(cors({ origin: ['http://localhost:5000'], }))

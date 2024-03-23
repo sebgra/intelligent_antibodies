@@ -21,15 +21,9 @@
 <script>
 export default {
   name:'Table',
-  data() {
-    return {
-      novar:42
-
-    }
-  },
   props: {
     datas: Array
-  }
+  },
 }
 </script>
 
@@ -41,6 +35,7 @@ export default {
   border: 1px solid lightgrey;
   border-radius: 5px;
   justify-content: left;
+  overflow:hidden;
 }
 .table_header {
   display: flex;
@@ -56,6 +51,7 @@ export default {
   display: flex;
   justify-content: space-between;
   border-bottom: 1px solid lightgrey;
+  overflow: hidden;
 }
 .table_line:last-child{
   border-bottom: none
@@ -70,6 +66,7 @@ export default {
   width: 75%;
   border-right: 1px solid lightgrey;
   padding: 5px;
+  overflow: inherit;
 }
 .table_score {
   width: 15%;
