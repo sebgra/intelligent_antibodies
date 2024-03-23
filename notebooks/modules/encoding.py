@@ -21,7 +21,7 @@ class ProteinOneHotEncoder:
             code = base.copy()
             code[index] = 1
             encoder[letter] = code
-            decoder[code] = letter
+            decoder[tuple(code)] = letter
         return encoder, decoder
 
     def one_hot_encode_sequence(self, sequence: str, vector_size: int) -> np.ndarray:
@@ -41,7 +41,7 @@ class ProteinOneHotEncoder:
     def decode(self, x_encode: np.ndarray):
         seq: list[str] = [''] * x_encode.shape[0]
         for i, code in enumerate(x_encode):
-            seq[i] = self.decoder[code]
+            seq[i] = self.decoder[tuple(code)]
         return seq
     
 
@@ -53,7 +53,7 @@ class NLFEncoder:
         # If we encounter Selenocysteine, we'll treat it as Cysteine
         self.nlf['U'] = self.nlf['C']
         self.decoder = {
-            self.nlf[letter]: letter for letter in self.nlf.columns
+            tuple(self.nlf[letter]): letter for letter in self.nlf.columns
         }
     
     def encode_sequence(self, sequence: str, vector_size: int=1500) -> np.ndarray:
@@ -72,7 +72,7 @@ class NLFEncoder:
     def decode(self, x_encode: np.ndarray):
         seq: list[str] = [''] * x_encode.shape[0]
         for i, code in enumerate(x_encode):
-            seq[i] = self.decoder[code]
+            seq[i] = self.decoder[tuple(code)]
         return seq
 
 class BLOSUMEncoder:
@@ -103,7 +103,7 @@ class BLOSUMEncoder:
     def decode(self, x_encode: np.ndarray):
         seq: list[str] = [''] * x_encode.shape[0]
         for i, code in enumerate(x_encode):
-            seq[i] = self.decoder[code]
+            seq[i] = self.decoder[tuple(code)]
         return seq
 
 
