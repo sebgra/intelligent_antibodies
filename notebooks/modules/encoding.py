@@ -3,6 +3,7 @@ ref. Fidle
 """
 import numpy as np
 import pandas as pd
+import itertools
 
 AMINO_ACID_ALPHABET = "ARNDCQEGHILKMFPSTWYVXU"
 
@@ -79,3 +80,25 @@ class BLOSUMEncoder:
             tensors.append(self.encode_sequence(sequence))
         return np.array(tensors)
     
+
+"""
+Kmers Frequency
+"""
+
+def alphabet_kmer(alphabet=AMINO_ACID_ALPHABET, k: int=3):
+    kmers_order = itertools.product(*itertools.repeat(alphabet, k))
+    encoding = {}
+    for kmer in kmers_order:
+        encoding[kmer] = 0
+    return encoding
+
+def kmer_frequency_encode(sequence: str, encoder: dict[str, int], k: int=3):
+    kmers = []
+    for i in range(len(sequence)-k):
+        kmers.append(sequence[i:i+k+1])
+    for subseq in kmers:
+        encoder[subseq] += 1
+    frequency = []
+    for key in encoder.key():
+        frequency.append(encoder[key])
+    return frequency
