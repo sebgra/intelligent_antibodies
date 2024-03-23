@@ -1,5 +1,8 @@
 import keras
 import tensorflow as tf
+import os
+
+from modules.layers import SamplingLayer
 
 class VAE(keras.Model):
     def __init__(self, encoder, decoder, **kwargs):
@@ -43,3 +46,17 @@ class VAE(keras.Model):
             "reconstruction_loss": self.reconstruction_loss_tracker.result(),
             "kl_loss": self.kl_loss_tracker.result(),
         }
+
+    def save(self,filename):
+        """Save model in 2 part"""
+        filename, extension = os.path.splitext(filename)
+        self.encoder.save(f'{filename}-encoder.keras')
+        self.decoder.save(f'{filename}-decoder.keras')
+
+    
+    def reload(self,filename):
+        """Reload a 2 part saved model."""
+        filename, extension = os.path.splitext(filename)
+        self.encoder = keras.models.load_model(f'{filename}-encoder.keras', custom_objects={'SamplingLayer': SamplingLayer})
+        self.decoder = keras.models.load_model(f'{filename}-decoder.keras')
+        print('Reloaded.')

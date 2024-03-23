@@ -4,20 +4,15 @@
 # JL Parouty (mars 2024)
 
 import keras
-import torch
-from torch.distributions.normal import Normal
+import tensorflow as tf
 
+@keras.saving.register_keras_serializable()
 class SamplingLayer(keras.layers.Layer):
-    '''A custom layer that receive (z_mean, z_var) and sample a z vector'''
+    """Uses (z_mean, z_log_var) to sample z, the vector encoding a digit."""
 
     def call(self, inputs):
-        
         z_mean, z_log_var = inputs
-        
-        batch_size, latent_dim = z_mean.shape
-        
-        epsilon = Normal(0, 1).sample((batch_size, latent_dim)).to(z_mean.device)
-
-        z = z_mean + torch.exp(0.5 * z_log_var) * epsilon 
-        
-        return z
+        batch = tf.shape(z_mean)[0]
+        dim = tf.shape(z_mean)[1]
+        epsilon = tf.random.normal(shape=(batch, dim))
+        return z_mean + tf.exp(0.5 * z_log_var) * epsilon
