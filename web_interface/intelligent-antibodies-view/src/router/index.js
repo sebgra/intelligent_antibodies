@@ -14,8 +14,13 @@ const router = createRouter({
       component: () => import('../views/GenerateView.vue')
     },
     {
-      path: '/display',
+      path: '/display/:sequence',
       name: 'display',
+      component: () => import('../views/DisplayView.vue')
+    },
+    {
+      path: '/display',
+      name: 'display_none',
       component: () => import('../views/DisplayView.vue')
     },
     {

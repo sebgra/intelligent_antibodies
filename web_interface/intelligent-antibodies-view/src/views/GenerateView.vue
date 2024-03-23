@@ -3,11 +3,13 @@
     <div class="input">
       <InputVue 
         text="Enter an antigene's peptidic sequence"
+        title="Antigene input"
         @updateText="updateText"
+        @error="setInputError"
       />
     </div>
     <div class="action">
-      <Action :activated="isValidText" @action="sendRequest"/>
+      <Action title="Launch generation" :activated="isValidText&!getInputError" @action="sendRequest"/>
     </div>
     <div class="table-view" v-if="hasDatas">
         <h3 style="margin-bottom:5px">
@@ -17,7 +19,12 @@
       <TableView :datas="getTableDatas"/>
     </div>
     <div v-else-if="getIsLoading">
-      Loading
+      <div class="center">
+        <img  src="@/assets/loading.gif" alt="Loading" />
+      </div>
+      <div class="center">
+        <h3>Generating data ...</h3>
+      </div>
     </div>
     <div v-if="getIsError">
       An error occured: {{ error }}
@@ -38,7 +45,8 @@ export default {
         isLoading: false,
         isError:false,
         error:'',
-        tableDatas: []
+        tableDatas: [],
+        inputError: false
       }
     },
     components: {
@@ -48,7 +56,7 @@ export default {
     },
     computed: {
       isValidText: function() {
-        return this.antigene.length > 0
+        return Boolean(this.antigene.length > 0)
       },
       getIsLoading: function() {
         return this.isLoading
@@ -61,11 +69,18 @@ export default {
       },
       getTableDatas: function() {
         return this.tableDatas
+      },
+      getInputError: function() {
+        return this.inputError
       }
     },
     methods: {
       updateText(emited) {
         this.antigene = emited
+        this.inputError = false
+      },
+      setInputerror() {
+        this.inputError = true
       },
       transpose(table) {
         var new_table = []
@@ -117,6 +132,18 @@ export default {
   margin-top: 10px
 }
 
+.loader {
+  margin:auto;
+  display: block;
+  justify-content: center;
+}
+
+.center {
+  margin: auto;
+  display: flex;
+  justify-content: center;
+}
+
 .input {
   width: 100%;
 }
@@ -131,4 +158,3 @@ export default {
   padding: 10px;
 }
 </style>
-../api/api.js

@@ -1,7 +1,7 @@
 <template>
   <div class="action-wrapper">
     <button id='button' :disabled="!activated" class="action-button" @click="launchGen">
-      Launch generation
+      {{ title }}
     </button>
   </div>
 </template>
@@ -9,9 +9,8 @@
 export default {
   name:'Action',
   props: {
-    activated: {
-      type: Boolean
-    }
+    activated:Boolean,
+    title:String,
   },
   methods: {
     launchGen() {

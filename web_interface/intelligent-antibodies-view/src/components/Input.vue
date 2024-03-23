@@ -2,13 +2,16 @@
   <div class="input-wrapper">
     <div class="input_title">
       <h3>
-        Antigene input
+        {{ title }}
       </h3>
 
       Please submit sequence
     </div>
       <div class="input_field-wrapper">
         <input class="input_field" :placeholder="text" @input="input_text">
+        <div class='error' v-if="getError.length > 0">
+          {{ getError }}
+        </div>
       </div>
       <div class="input_fasta-text">
         or select local fasta file
@@ -32,24 +35,47 @@
     data() {
       return {
         current_text: '',
-        selected: ''
+        selected: '',
+        error: '',
+        aminoAcids: ['A', 'R', 'N', 'D', 'C', 'E', 'Q', 'G', 'H', 'I', 'L', 'K', 'M', 'F', 'P', 'S', 'T', 'W', 'Y', 'V', 'X']
       }
     },
     props: {
       text:{
-        type:String
+        type:String,
+      },
+      title:{
+        type:String,
+      }
+    },
+    computed: {
+      getError() {
+        return this.error
       }
     },
     methods: {
       input_text(event) {
-        this.current_text = event.target.value
-        this.emitText(this.current_text)
+        if (this.rules(event.target.value)) {
+          this.error = ''
+          this.current_text = event.target.value
+          this.emitText(this.current_text)
+        } else {
+          this.error = event.target.value + ' is not a protein !'
+          this.emitError()
+        }
+      },
+      emitError() {
+        this.$emit('error')
       },
       emitText(item) {
          this.$emit('update-text', item)
       },
       find_fasta() {
         console.log(find_fasta)
+      },
+      rules(sequence) {
+        const re = new RegExp("^["+ this.aminoAcids.join("")+"]*$")
+        return sequence.length === 0 || sequence.match(re)
       }
     }
   }
@@ -61,6 +87,11 @@
 .input_title {
   padding: 5px;
   margin: 5px;
+}
+.error {
+  padding:5px;
+  font-size:10;
+  color:red;
 }
 .input-wrapper {
   display: block;

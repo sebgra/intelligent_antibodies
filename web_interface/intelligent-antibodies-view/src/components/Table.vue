@@ -13,7 +13,7 @@
         {{ line[1] }}
       </div>
       <div class="table_button">
-        <button>View</button>
+        <button :key="line[0]" @click="gotodisplay">View</button>
       </div>
     </div>
   </div>
@@ -23,6 +23,16 @@ export default {
   name:'Table',
   props: {
     datas: Array
+  },
+  data() {
+      return {
+      }
+    },
+  methods: {
+    gotodisplay(event) {
+      const sequence = event.target.__vnode.key
+      this.$router.push({ path: '/display/' + sequence})
+    }
   },
 }
 </script>
