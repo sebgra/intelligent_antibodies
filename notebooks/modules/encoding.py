@@ -42,7 +42,7 @@ def alphabet_kmer(alphabet=AMINO_ACID_ALPHABET, k: int=3):
 
 def kmer_frequency_encode(sequence: str, encoder: dict[str, int], k: int=3):
     kmers = []
-    for i in range(len(sequence)):
+    for i in range(len(sequence)-k):
         kmers.append(sequence[i:i+k+1])
     for subseq in kmers:
         encoder[subseq] += 1
