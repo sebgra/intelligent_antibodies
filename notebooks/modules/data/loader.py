@@ -17,9 +17,19 @@ class SequenceEncodingDataGenerator(Sequence):
         return len(self.labels)
     
     def __getitem__(self, index):
+        if isinstance(index, slice):
+            start, stop, step = index.start, index.stop, index.step
+            if step is None:
+                step=1
+            if start is None:
+                start = 0
+            if stop is None:
+                stop = self.__len__()
+            return [self[num] for num in range(start, stop, step)]
         ag_seq_id = self.x_df.iloc[index]['ag']
         ab_seq_id = self.x_df.iloc[index]['ab']
         x_ag = self.seq_id_to_encoded_sequences[ag_seq_id]
         x_ab = self.seq_id_to_encoded_sequences[ab_seq_id]
         y = self.labels.iloc[index]['interaction']
-        return ([x_ag, x_ab], y)
+        return (np.array([x_ag, x_ab], dtype=np.float32), np.array(y, dtype=np.float32))
+    

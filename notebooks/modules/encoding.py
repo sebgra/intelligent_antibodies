@@ -60,24 +60,24 @@ class NLFEncoder:
 
 class BLOSUMEncoder:
     def __init__(self):
-        blosum = pd.read_csv('../data/BLOSUM62.csv', index_col=0)
+        self.blosum = pd.read_csv('../data/blosum62.csv', index_col=0)
         # If we encounter Selenocysteine, we'll treat it as Cysteine
-        blosum['U'] = blosum['C']
+        self.blosum['U'] = self.blosum['C']
         # # We will not encounter B, Z or * so we can delete the corresponding vectors
         # blosum.drop(labels=['B', 'Z', 'X', '*'], axis=0, inplace=True)
         # blosum.drop(labels=['B', 'Z', 'X', '*'], axis=1, inplace=True)
 
-    def encode_sequence(self, sequence: str, vector_size: int=1500) -> np.ndarray:
+    def encode_sequence(self, sequence: str, vector_size: int) -> np.ndarray:
         sequence = sequence[:vector_size]
         seq_tensor = np.zeros((vector_size, self.blosum.shape[0]), dtype=np.float16)
         for i, letter in enumerate(sequence):
             seq_tensor[i] = self.blosum[letter]
         return seq_tensor
     
-    def encode(self, x):
+    def encode(self, x, vector_size: int=1500):
         tensors = []
         for sequence in x:
-            tensors.append(self.encode_sequence(sequence))
+            tensors.append(self.encode_sequence(sequence, vector_size))
         return np.array(tensors)
     
 
