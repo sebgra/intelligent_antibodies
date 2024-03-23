@@ -38,7 +38,7 @@ class ProteinOneHotEncoder:
 
 class NLFEncoder:
     def __init__(self, ):
-        self.nlf = pd.read_csv('../data/NFL.csv', index_col=0)
+        self.nlf = pd.read_csv('../data/NLF.csv', index_col=0)
         # The letter X will represent an empty position (added in case we might encounter empty spots somewhere)
         self.nlf['X'] = [0.0] * self.nlf.shape[0]
         # If we encounter Selenocysteine, we'll treat it as Cysteine
