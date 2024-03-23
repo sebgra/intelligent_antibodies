@@ -11,16 +11,18 @@ class ProteinOneHotEncoder:
 
     def __init__(self, alphabet=AMINO_ACID_ALPHABET):
         self.alphabet = alphabet
-        self.encoder = self.alphabet_one_hot()
+        self.encoder, self.decoder = self.alphabet_one_hot()
 
     def alphabet_one_hot(self):
         base = np.zeros((len(self.alphabet)))
-        encoding = {}
+        encoder = {}
+        decoder = {}
         for index, letter in enumerate(self.alphabet):
             code = base.copy()
             code[index] = 1
-            encoding[letter] = code
-        return encoding
+            encoder[letter] = code
+            decoder[code] = letter
+        return encoder, decoder
 
     def one_hot_encode_sequence(self, sequence: str, vector_size: int) -> np.ndarray:
         encoded = np.zeros((vector_size, len(self.encoder)))
@@ -35,6 +37,13 @@ class ProteinOneHotEncoder:
         for sequence in x:
             x_encode.append(self.one_hot_encode_sequence(sequence, vector_size))
         return np.array(x_encode)
+    
+    def decode(self, x_encode: np.ndarray):
+        seq: list[str] = [''] * x_encode.shape[0]
+        for i, code in enumerate(x_encode):
+            seq[i] = self.decoder[code]
+        return seq
+    
 
 class NLFEncoder:
     def __init__(self, ):
@@ -43,6 +52,9 @@ class NLFEncoder:
         self.nlf['X'] = [0.0] * self.nlf.shape[0]
         # If we encounter Selenocysteine, we'll treat it as Cysteine
         self.nlf['U'] = self.nlf['C']
+        self.decoder = {
+            self.nlf[letter]: letter for letter in self.nlf.columns
+        }
     
     def encode_sequence(self, sequence: str, vector_size: int=1500) -> np.ndarray:
         sequence = sequence[:vector_size]
@@ -57,6 +69,11 @@ class NLFEncoder:
             tensors.append(self.encode_sequence(sequence))
         return np.array(tensors)
     
+    def decode(self, x_encode: np.ndarray):
+        seq: list[str] = [''] * x_encode.shape[0]
+        for i, code in enumerate(x_encode):
+            seq[i] = self.decoder[code]
+        return seq
 
 class BLOSUMEncoder:
     def __init__(self):
@@ -66,6 +83,9 @@ class BLOSUMEncoder:
         # # We will not encounter B, Z or * so we can delete the corresponding vectors
         # blosum.drop(labels=['B', 'Z', 'X', '*'], axis=0, inplace=True)
         # blosum.drop(labels=['B', 'Z', 'X', '*'], axis=1, inplace=True)
+        self.decoder = {
+            self.blosum[letter]: letter for letter in self.blosum.columns
+        }
 
     def encode_sequence(self, sequence: str, vector_size: int=1500) -> np.ndarray:
         sequence = sequence[:vector_size]
@@ -79,7 +99,13 @@ class BLOSUMEncoder:
         for sequence in x:
             tensors.append(self.encode_sequence(sequence))
         return np.array(tensors)
-    
+
+    def decode(self, x_encode: np.ndarray):
+        seq: list[str] = [''] * x_encode.shape[0]
+        for i, code in enumerate(x_encode):
+            seq[i] = self.decoder[code]
+        return seq
+
 
 """
 Kmers Frequency
