@@ -9,7 +9,7 @@
       />
     </div>
     <div class="action">
-      <Action title="Launch generation" :activated="isValidText&!getInputError" @action="sendRequest"/>
+      <Action title="Launch generation" :activated="Boolean(isValidText&!getInputError)" @action="sendRequest"/>
     </div>
     <div class="table-view" v-if="hasDatas">
         <h3 style="margin-bottom:5px">
@@ -29,6 +29,20 @@
     <div v-if="getIsError">
       An error occured: {{ error }}
     </div>
+    <!--
+    <div class="export">
+      <vue-json-to-csv
+        :json-data="getTableJson"
+        csv-title="generated_antibodies"
+        @success="val => console.log(val)"
+        @error="val => console.error(val)"
+      >
+          <button class="export_button">
+            Export 
+          </button>
+      </vue-json-to-csv>
+    </div>
+    -->
   </div>
 </template>
 
@@ -36,6 +50,7 @@
 import InputVue from "../components/Input.vue"
 import Action from "../components/Action.vue"
 import TableView from "../components/Table.vue"
+import VueJsonToCsv from 'vue-json-to-csv'
 import api from '@/api/api.js'
 export default {
     name: 'GenerateView',
@@ -46,6 +61,7 @@ export default {
         isError:false,
         error:'',
         tableDatas: [],
+        tableJson: {},
         inputError: false,
         inputText: "Enter an antigene's peptidic sequence"
       }
@@ -53,11 +69,15 @@ export default {
     components: {
       InputVue,
       Action,
-      TableView
+      TableView,
+      VueJsonToCsv,
     },
     computed: {
       isValidText: function() {
         return Boolean(this.antigene.length > 0)
+      },
+      getTableJson: function() {
+        return this.tableJson
       },
       getIsLoading: function() {
         return this.isLoading
@@ -76,12 +96,14 @@ export default {
       }
     },
     mounted() {
-      console.log('mounted', this.$store)
       if (this.$store.state.antigenesTable.length > 0) {
         this.tableDatas = this.$store.state.antigenesTable
       }
       if (this.$store.state.sequence.length > 0) {
         this.inputText = this.$store.state.sequence
+      }
+      if (this.$store.state.json.length > 0) {
+        this.dataJson = this.$store.state.json
       }
     },
     methods: {
@@ -114,6 +136,13 @@ export default {
         });
         return this.transpose(table)
       },
+      toJson(datas) {
+        const json = []
+        for (var line in datas) {
+          json.push({'Sequence':line[0], 'Score':line[1]})
+        }
+        return JSON.stringify(json)
+      },
       async sendRequest () {
         try {
           this.isError = false
@@ -121,9 +150,10 @@ export default {
           const res = await api.generate.getGenerateData(this.antigene)
           this.isLoading = false
           this.tableDatas = this.parse_result(res)
+          this.tableJson = this.toJson(this.tableDatas)
           this.$store.commit('setAntigenesTable', {data:this.tableDatas})
           this.$store.commit('setSequence', {data:this.antigene})
-          console.log('kept', this.$store.state.antigenesTable)
+          this.$store.commit('setJson', {data:this.tableJson})
         } catch (error) {
           this.isLoading = false
           this.error = error
@@ -151,6 +181,21 @@ export default {
   justify-content: center;
 }
 
+.export {
+  margin:auto;
+  width: 100%;
+  display: flex;
+  justify-content: center;
+}
+
+.export_button {
+  background-color:#409d9e;
+  border: none;
+  border-radius: 2px;
+  color: white;
+  padding:5px;
+  font-weight: 700;
+}
 .center {
   margin: auto;
   display: flex;

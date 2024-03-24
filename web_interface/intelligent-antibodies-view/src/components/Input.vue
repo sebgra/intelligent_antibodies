@@ -8,7 +8,7 @@
       Please submit sequence
     </div>
       <div class="input_field-wrapper">
-        <input class="input_field" :placeholder="text" @input="input_text">
+        <input ref="input" class="input_field" :placeholder="text" @input="input_text">
         <div class='error' v-if="getError.length > 0">
           {{ getError }}
         </div>
@@ -17,8 +17,9 @@
         or select local fasta file
       </div>
       <div class="input_button-wrapper">
-        <button class="input_button" @click="find_fasta">
-          Explore
+        <input style="opacity: 0;position:absolute" type="file" @change="loadTextFromFile" />
+        <button class="input_button">
+            Explore 
         </button>
         <div v-if="selected.length > 0" class="input_button-selected">
           {{ selected }}
@@ -30,13 +31,15 @@
     </div>
 </template>
 <script>
- export default {
+import { nextTick } from 'vue'
+export default {
     name: 'Input',
     data() {
       return {
         current_text: '',
         selected: '',
         error: '',
+        fileContent: '',
         aminoAcids: ['A', 'R', 'N', 'D', 'C', 'E', 'Q', 'G', 'H', 'I', 'L', 'K', 'M', 'F', 'P', 'S', 'T', 'W', 'Y', 'V', 'X']
       }
     },
@@ -51,6 +54,9 @@
     computed: {
       getError() {
         return this.error
+      },
+      getFileContent() {
+        return this.fileContent
       }
     },
     methods: {
@@ -64,14 +70,50 @@
           this.emitError()
         }
       },
+      watch: {
+        getFileContent(newValue, oldValue) {
+          this.loadedContent()
+        },
+      },
+      loadedContent() {
+        var sequence = this.parseFasta(this.getFileContent)
+          if (sequence !== '') {
+            this.current_text = sequence
+            this.emitText(this.current_text)
+            this.$refs.input.value = this.current_text
+          } else {
+            this.selected = this.selected + ' could not be parsed'
+          }
+      },
+      parseFasta(fasta) {
+        const lines = fasta.split("\n");
+        const ref = lines[0]
+        if (ref[0] === '>') {
+          return lines[1]
+        } else {
+          return ''
+        }
+      },
+      async loadTextFromFile(ev) {
+        const file = ev.target.files[0];
+        const reader = new FileReader();
+        if (file.name.includes(".fasta") || file.name.includes(".fa")) {
+          reader.onload = (res) => {
+            this.fileContent = res.target.result;
+          };
+          reader.onerror = (err) => console.log(err);
+          reader.readAsText(file);
+          this.selected = file.name
+          this.loadedContent()
+        } else {
+          this.selected = file.name + ' is not a fasta file'
+        }
+      },
       emitError() {
         this.$emit('error')
       },
       emitText(item) {
          this.$emit('update-text', item)
-      },
-      find_fasta() {
-        console.log(find_fasta)
       },
       rules(sequence) {
         const re = new RegExp("^["+ this.aminoAcids.join("")+"]*$")

@@ -3,7 +3,8 @@ import { createStore } from 'vuex'
 export default createStore({
   state: {
     antigenesTable: [],
-    sequence: ''
+    sequence: '',
+    json: []
   },
   mutations: {
     setAntigenesTable(state, payload) {
@@ -11,6 +12,9 @@ export default createStore({
     },
     setSequence(state, payload) {
       state.sequence= payload.data
+    },
+    setJson(state, payload) {
+      state.json= payload.data
     },
   }
 })
