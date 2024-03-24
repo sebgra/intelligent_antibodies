@@ -1,5 +1,6 @@
 import axios from 'axios'
 import generate from './generate'
+import structure from './structure'
 
 function setAxiosInterceptors (axiosInstance) {
   axiosInstance.interceptors.request.use((config) => {
@@ -18,5 +19,6 @@ const instance = setAxiosInterceptors(
 )
 
 export default {
-  generate: generate(instance)
+  generate: generate(instance),
+  structure: structure(instance)
 }

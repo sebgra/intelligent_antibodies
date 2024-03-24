@@ -111,7 +111,7 @@ export default {
         this.antigene = emited
         this.inputError = false
       },
-      setInputerror() {
+      setInputError() {
         this.inputError = true
       },
       transpose(table) {

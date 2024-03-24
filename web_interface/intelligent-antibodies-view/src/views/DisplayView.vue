@@ -13,10 +13,21 @@
       <div class="display_structure">
         <div class="title">
           <h3 style="margin:5px; font-weight:700">3D structure</h3> 
-          <h3 style="margin:auto; margin-left:10px"> From PDB closest sequence {{ id }}</h3>
+          <h3 style="margin:auto; margin-left:10px"> From PDB closest sequence {{ getId }}</h3>
         </div>
-        
       </div>
+      <div v-if="getIsLoaded">
+        <protein :protId="getId"/>
+        <h6 style="margin: auto;text-align: center;">PV © Copyright 2013-2015, Marco Biasini, DOI: 10.5281/zenodo.592834</h6>
+      </div>
+      <div v-if="!getIsLoaded">
+          <div class="center">
+            <img  src="@/assets/loading.gif" alt="Loading"  />
+          </div>
+          <div class="center">
+            <h3>Retrieving structure ...</h3>
+          </div>
+        </div>
     </div>
     <div v-else class="display_retrieve">
       <InputView
@@ -34,23 +45,38 @@
 <script>
 import Action from '../components/Action.vue'
 import InputView from '../components/Input.vue'
+import Protein from '../components/Protein.vue'
+import api from '@/api/api.js'
+
 export default {
   name:'Display',
   components: {
     InputView,
-    Action
+    Action,
+    Protein
   },
-
   data() {
     return {
       antibody: '',
-      id: 'Nothing for now',
+      id: '(Loading...)',
       isLoaded: false,
+      pdbFile: ''
     }
   },
   computed: {
     getIsLoaded() {
       return this.isLoaded
+    },
+    getId() {
+      return this.id
+    }
+  },
+  async mounted() {
+    if (this.$route.params.sequence) {
+      this.antibody = this.$route.params.sequence
+      this.id = await api.structure.getId(this.antibody)
+      this.pdbFile = await api.structure.getPDB(this.id)
+      this.isLoaded = true
     }
   },
   methods: {
@@ -109,4 +135,11 @@ export default {
   margin-top: 10px;
   color: white
 }
+
+.center {
+  margin: auto;
+  display: flex;
+  justify-content: center;
+}
+
 </style>

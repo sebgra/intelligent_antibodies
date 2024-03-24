@@ -17,7 +17,7 @@
         or select local fasta file
       </div>
       <div class="input_button-wrapper">
-        <input style="opacity: 0;position:absolute" type="file" @change="loadTextFromFile" />
+        <input style="opacity: 0;position:absolute" type="file" @click="loadTextFromFile" />
         <button class="input_button">
             Explore 
         </button>
@@ -31,7 +31,6 @@
     </div>
 </template>
 <script>
-import { nextTick } from 'vue'
 export default {
     name: 'Input',
     data() {
@@ -70,11 +69,6 @@ export default {
           this.emitError()
         }
       },
-      watch: {
-        getFileContent(newValue, oldValue) {
-          this.loadedContent()
-        },
-      },
       loadedContent() {
         var sequence = this.parseFasta(this.getFileContent)
           if (sequence !== '') {
@@ -89,22 +83,33 @@ export default {
         const lines = fasta.split("\n");
         const ref = lines[0]
         if (ref[0] === '>') {
-          return lines[1]
+          var seq = ''
+          let i = 1
+          while (i < lines.length) {
+            if (lines[i][0] != '>') {
+              break
+            }
+            seq = seq + lines[i]
+            console.log('seq')
+            i++
+          }
+          return seq
         } else {
           return ''
         }
       },
-      async loadTextFromFile(ev) {
-        const file = ev.target.files[0];
-        const reader = new FileReader();
+      loadTextFromFile(ev) {
+        const file = ev.target.files[0]
         if (file.name.includes(".fasta") || file.name.includes(".fa")) {
+          const reader = new FileReader();
           reader.onload = (res) => {
             this.fileContent = res.target.result;
           };
-          reader.onerror = (err) => console.log(err);
           reader.readAsText(file);
           this.selected = file.name
-          this.loadedContent()
+          this.$nextTick(
+            this.loadedContent()
+          )
         } else {
           this.selected = file.name + ' is not a fasta file'
         }
