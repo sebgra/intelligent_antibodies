@@ -41,8 +41,10 @@ class ProteinOneHotEncoder:
     def decode(self, x_encode: np.ndarray):
         seq: list[str] = [''] * x_encode.shape[0]
         for i, code in enumerate(x_encode):
-            seq[i] = self.decoder[tuple(code)]
+            max_index = np.argmax(code)
+            seq[i] = self.alphabet[max_index]
         return seq
+
     
 
 class NLFEncoder:

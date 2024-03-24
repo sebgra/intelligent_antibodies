@@ -38,3 +38,35 @@ class OneHotProtDataset:
         y_data = enc_seq_type
         alphabet_size = len(encoding.AMINO_ACID_ALPHABET)
         return X_data, y_data, vector_size, alphabet_size
+    
+
+class AntibodyOneHotProtDataset:
+    def get_data(vector_size):
+        df_seq = pd.read_csv("../data/SAbDab/sequences.csv", sep=";")
+        df_seq[["seq_rcpb", "seq_type"]] = df_seq["seq_id"].str.split('|',  n=1, expand=True)
+        df_seq = df_seq[df_seq["seq_type"] == "ab"] 
+        ordinal_encoder = OrdinalEncoder()
+        enc_seq_type = ordinal_encoder.fit_transform(df_seq[["seq_type"]])
+        seq = df_seq["sequence"]
+        encoder = encoding.ProteinOneHotEncoder(encoding.AMINO_ACID_ALPHABET)
+        seq_encoded = encoder.encode(seq, vector_size)
+        X_data = seq_encoded
+        y_data = enc_seq_type
+        alphabet_size = len(encoding.AMINO_ACID_ALPHABET)
+        return X_data, y_data, vector_size, alphabet_size
+
+
+class AntibodyNLFProtDataset:
+    def get_data(vector_size):
+        df_seq = pd.read_csv("../data/SAbDab/sequences.csv", sep=";")
+        df_seq[["seq_rcpb", "seq_type"]] = df_seq["seq_id"].str.split('|',  n=1, expand=True)
+        df_seq = df_seq[df_seq["seq_type"] == "ab"] 
+        ordinal_encoder = OrdinalEncoder()
+        enc_seq_type = ordinal_encoder.fit_transform(df_seq[["seq_type"]])
+        seq = df_seq["sequence"]
+        encoder = encoding.NLFEncoder()
+        seq_encoded = encoder.encode(seq, vector_size)
+        X_data = seq_encoded
+        y_data = enc_seq_type
+        alphabet_size = len(encoding.AMINO_ACID_ALPHABET)
+        return X_data, y_data, vector_size, encoder.nlf.shape[0]
