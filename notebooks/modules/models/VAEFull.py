@@ -1,7 +1,7 @@
 from keras import layers
 import keras
-from modules.layers.SamplingLayer import SamplingLayer
-from modules.models.VAE import VAE
+from ..layers.SamplingLayer import SamplingLayer
+from ..models.VAE import VAE
 
 class VAEFull:
 

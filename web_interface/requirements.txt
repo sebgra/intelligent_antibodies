@@ -1,0 +1,8 @@
+torch
+flask
+pandas
+numpy
+tensorflow
+keras
+scikit-learn
+biopython

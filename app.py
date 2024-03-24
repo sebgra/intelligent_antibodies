@@ -1,7 +1,7 @@
 # app.py
 
 from flask import Flask
-from main import *
+from . import main
 import pandas as pd
 import numpy as np
 from Bio import Align
@@ -14,15 +14,13 @@ from Bio.PDB import PDBList
 app = Flask(__name__)
 
 @app.route('/')
-
 def hello():
     return 'Hello from Flask!' 
 
 @app.route('/api/generate/<sequence>', methods=['GET'])
-
 def generate_antibodies(sequence):
     print(f'Loading sequence {sequence}')
-    resp = main(sequence)
+    resp = main.main(sequence)
     return resp, {"Access-Control-Allow-Origin": "*"}
 
 @app.route('/api/structure/align/<gen_seq>', methods=['GET'])

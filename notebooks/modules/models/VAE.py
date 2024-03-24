@@ -2,7 +2,7 @@ import keras
 import tensorflow as tf
 import os
 
-from modules.layers import SamplingLayer
+from ..layers import SamplingLayer
 
 class VAE(keras.Model):
     def __init__(self, encoder, decoder, **kwargs):

@@ -1,0 +1,17 @@
+[project]
+name = "notebooks"
+dynamic = ["version"]
+dependencies = []
+[project.urls]
+[build-system]
+requires = ["hatchling", "hatch-vcs"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build]
+[tool.hatch.version]
+source = "vcs"
+[tool.hatch.build.hooks.vcs]
+version-file = "notebooks/modules/_version.py"
+
+[tool.hatch.build.targets.wheel]
+sources = ["notebooks/modules"]
