@@ -6,7 +6,9 @@
 import keras
 import tensorflow as tf
 
-@keras.saving.register_keras_serializable()
+# from keras.utils import register_keras_serializable
+
+@keras.utils.register_keras_serializable()
 class SamplingLayer(keras.layers.Layer):
     """Uses (z_mean, z_log_var) to sample z, the vector encoding a digit."""
 

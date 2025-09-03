@@ -173,3 +173,15 @@ https://github.com/emersON106/AbAgIntPre/tree/main
 
  - Get this [data](https://github.com/emersON106/AbAgIntPre/tree/main/SAbDab) to have all the usefull PDBs, then collect all the corresponding fasta files.
  - Parse all the Fasta grepping "heavy chain", "light chain", "antibody", "antigene" to create dataset of sequences for both Ag and Ab.
+
+
+# Installation steps
+
+```bash
+mamba create -n test python==3.9
+mamba activate test
+mamba install numpy pandas keras matplotlib anaconda::scikit-learn -y
+mamba install tensorflow -y
+pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu
+
+```
