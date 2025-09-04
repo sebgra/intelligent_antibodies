@@ -110,7 +110,7 @@ class NLFEncoder:
             tuple(self.nlf[letter]): letter for letter in self.nlf.columns
         }
     
-    def encode_sequence(self, sequence: str|List[str], vector_size: int ) -> np.ndarray:
+    def encode_sequence(self, sequence: str, vector_size: int ) -> np.ndarray:
         """
         Encode protein sequence as amino acid alphabet to NLF encoded protein matrix.
 
@@ -132,6 +132,7 @@ class NLFEncoder:
             seq_tensor[i] = self.nlf[letter]
         return seq_tensor
 
+    # To be checked
     def encode(self, x, vector_size=2000) -> np.array:
         tensors = []
         for sequence in x:
@@ -141,7 +142,15 @@ class NLFEncoder:
     def decode(self, x_encode: np.ndarray):
         seq: list[str] = [''] * x_encode.shape[0]
         for i, code in enumerate(x_encode):
-            seq[i] = self.decoder[tuple(code)]
+            # Print the problematic tuple for debugging
+            print(f"Attempting to decode: {tuple(code)}")
+            try:
+                seq[i] = self.decoder[tuple(code)]
+            except KeyError:
+                print(f"KeyError: The tuple {tuple(code)} was not found in the decoder.")
+                # Optionally, print keys in the decoder to help debugging
+                # print("Decoder keys sample:", list(self.decoder.keys())[:5])
+                raise # Re-raise the exception after printing
         return seq
 
 class BLOSUMEncoder:
