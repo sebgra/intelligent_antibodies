@@ -7,7 +7,7 @@ from keras.utils import Sequence
 class SequenceEncodingDataGenerator(Sequence):
     """Generate data for antibody and antigen encoded sequence"""
 
-    def __init__(self, x: pd.DataFrame, labels: pd.Series, seq_id_to_encoded_sequences: dict[str, np.ndarray], batch_size=32):
+    def __init__(self, x: pd.DataFrame, labels: pd.Series, seq_id_to_encoded_sequences: dict[str, np.ndarray], batch_size: int = 32):
         self.seq_ids = list(seq_id_to_encoded_sequences.keys())
         self.x_df = x
         self.labels = labels 
