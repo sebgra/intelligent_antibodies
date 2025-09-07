@@ -36,19 +36,20 @@ class ProteinOneHotEncoder:
         return encoder, decoder
 
     def one_hot_encode_sequence(self, sequence: str, vector_size: int) -> np.ndarray:
-        """_summary_
+        """
+        Encode protein sequence as amino acid alphabet to one hot protein matrix.
 
         Parameters
         ----------
         sequence : str
-            _description_
+            Amino sequence acids to be one hot encoded
         vector_size : int
-            _description_
+            Set truncation size for the sequence to be encoded.
 
         Returns
         -------
         np.ndarray
-            _description_
+            Encoded amino acid sequence.
         """        
         encoded: tf.Tensor = np.zeros((vector_size, len(self.encoder)))
         if len(sequence) > vector_size:
@@ -106,9 +107,7 @@ class NLFEncoder:
         self.nlf['X'] = [0.0] * self.nlf.shape[0]
         # If we encounter Selenocysteine, we'll treat it as Cysteine
         self.nlf['U'] = self.nlf['C']
-        self.decoder = {
-            tuple(self.nlf[letter]): letter for letter in self.nlf.columns
-        }
+        self.decoder = {tuple(self.nlf[letter]): letter for letter in self.nlf.columns}
     
     def encode_sequence(self, sequence: str, vector_size: int ) -> np.ndarray:
         """
@@ -132,25 +131,28 @@ class NLFEncoder:
             seq_tensor[i] = self.nlf[letter]
         return seq_tensor
 
-    # To be checked
-    def encode(self, x, vector_size=2000) -> np.array:
-        tensors = []
-        for sequence in x:
-            tensors.append(self.encode_sequence(sequence, vector_size))
-        return np.array(tensors)
     
-    def decode(self, x_encode: np.ndarray):
+    def decode(self, x_encode: np.ndarray) -> list[str]:
+        """
+        Decode protein sequence from NLF encoding seq to string sequence with amino acid aphabet.
+
+        Parameters
+        ----------
+        x_encode : np.ndarray
+            NLF encoded sequence to decode.
+
+        Returns
+        -------
+        list[str]
+            Decoded sequence as amino acids.
+        """        
         seq: list[str] = [''] * x_encode.shape[0]
+        
         for i, code in enumerate(x_encode):
-            # Print the problematic tuple for debugging
-            print(f"Attempting to decode: {tuple(code)}")
-            try:
-                seq[i] = self.decoder[tuple(code)]
-            except KeyError:
-                print(f"KeyError: The tuple {tuple(code)} was not found in the decoder.")
-                # Optionally, print keys in the decoder to help debugging
-                # print("Decoder keys sample:", list(self.decoder.keys())[:5])
-                raise # Re-raise the exception after printing
+            for key_tuple, amino_acid in self.decoder.items():
+                # handling floating-point precision
+                if np.allclose(code, key_tuple, atol=1e-3):
+                    seq[i] = amino_acid
         return seq
 
 class BLOSUMEncoder:
@@ -158,14 +160,24 @@ class BLOSUMEncoder:
         self.blosum = pd.read_csv('../data/blosum62.csv', index_col=0)
         # If we encounter Selenocysteine, we'll treat it as Cysteine
         self.blosum['U'] = self.blosum['C']
-        # # We will not encounter B, Z or * so we can delete the corresponding vectors
-        # blosum.drop(labels=['B', 'Z', 'X', '*'], axis=0, inplace=True)
-        # blosum.drop(labels=['B', 'Z', 'X', '*'], axis=1, inplace=True)
-        self.decoder = {
-            self.blosum[letter]: letter for letter in self.blosum.columns
-        }
+        self.decoder = {tuple(self.blosum[letter]): letter for letter in self.blosum.columns}
 
     def encode_sequence(self, sequence: str, vector_size: int) -> np.ndarray:
+        """
+        Encode protein sequence as amino acid alphabet to BLOSUM protein matrix.
+
+        Parameters
+        ----------
+        sequence : str
+            Amino sequence acids to be BLOSUM encoded.
+        vector_size : int
+            Set truncation size for the sequence to be encoded.
+
+        Returns
+        -------
+        np.ndarray
+            Encoded amino acid sequence.
+        """        
         sequence = sequence[:vector_size]
         seq_tensor = np.zeros((vector_size, self.blosum.shape[0]), dtype=np.float16)
         for i, letter in enumerate(sequence):
@@ -178,7 +190,20 @@ class BLOSUMEncoder:
             tensors.append(self.encode_sequence(sequence, vector_size))
         return np.array(tensors)
 
-    def decode(self, x_encode: np.ndarray):
+    def decode(self, x_encode: np.ndarray) -> List[str]:
+        """
+        Decode protein sequence from BLOSUM encoding seq to string sequence with amino acid aphabet.
+
+        Parameters
+        ----------
+        x_encode : np.ndarray
+            BLOSUM encoded sequence to decode.
+
+        Returns
+        -------
+        list[str]
+            Decoded sequence as amino acids.
+        """
         seq: list[str] = [''] * x_encode.shape[0]
         for i, code in enumerate(x_encode):
             seq[i] = self.decoder[tuple(code)]

@@ -1,4 +1,5 @@
 import os
+from typing import List, Tuple, Any
 
 import numpy as np
 import pandas as pd
@@ -9,42 +10,118 @@ from . import encoding
 from sklearn.preprocessing import OrdinalEncoder
 
 class EquilibratedDataset:
-    def __init__(self, encoder):
-        self.encoder = encoder
+    """
+    Loads, filters, and equilibrates a dataset of protein sequences for
+    machine learning tasks.
 
-    def getdata(self, vector_size):
-        df_seq = pd.read_csv("../data/SAbDab/sequences.csv", sep=";")
-        df_seq[["seq_rcpb", "seq_type"]] = df_seq["seq_id"].str.split('|',  n=1, expand=True)
-        df_seq_ab = df_seq[df_seq["seq_type"] == "ab"]
-        df_seq_ag = df_seq[df_seq["seq_type"] == "ag"]
-        # n_ab = df_seq_ab.shape[0]
-        # n_ag = df_seq_ag.shape[0]
-        # print(n_ab, n_ag)
-        # df_seq_ag_selected = df_seq_ag.sample(n_ab, replace=False)
-        df_match = pd.read_csv("../data/SAbDab/data_filtered.csv", sep=";")
-        # df_seq_equilibrated = pd.concat([df_seq_ab, df_seq_ag_selected])
-        # df_filtered_equilibrated = df_match[df_match["ab"].isin(df_seq_equilibrated["seq_id"]) & df_match["ag"].isin(df_seq_equilibrated["seq_id"])]
-        data = df_match
-        data = data.merge(df_seq, left_on="ab", right_on="seq_id", how="inner")
+    This class handles the loading of antibody (ab) and antigen (ag)
+    sequence data, merges it with interaction data, and balances the
+    dataset to have an equal number of interacting and non-interacting pairs.
+
+    Parameters
+    ----------
+    encoder : object
+        An encoder object with `encode` and `encode_sequence` methods
+        to convert protein sequences into numerical matrices.
+    """
+
+    def __init__(self, encoder: Any):
+        self.encoder = encoder
+        self.df_seq = pd.read_csv("../data/SAbDab/sequences.csv", sep=";")
+        self.df_match = pd.read_csv("../data/SAbDab/data_filtered.csv", sep=";")
+
+    def _prepare_dataframes(self) -> pd.DataFrame:
+        """
+        Prepares and merges the sequence and interaction dataframes.
+
+        Returns
+        -------
+        pd.DataFrame
+            A merged DataFrame containing antibody and antigen sequences
+            and their interaction labels.
+        """
+        self.df_seq[["seq_rcpb", "seq_type"]] = self.df_seq["seq_id"].str.split('|',  n=1, expand=True)
+        
+        # Merge interaction data with antibody and antigen sequences
+        data = self.df_match.merge(self.df_seq, left_on="ab", right_on="seq_id", how="inner")
         data.rename(columns={"sequence": "sequence_ab"}, inplace=True)
-        data = data.merge(df_seq, left_on="ag", right_on="seq_id", how="inner")
+        
+        data = data.merge(self.df_seq, left_on="ag", right_on="seq_id", how="inner")
         data.rename(columns={"sequence": "sequence_ag"}, inplace=True)
-        data = data[["sequence_ab", "sequence_ag", "interaction"]]
-        # Equilibrate interaction vs not interaction
+        
+        return data[["sequence_ab", "sequence_ag", "interaction"]]
+
+    def _equilibrate_data(self, data: pd.DataFrame) -> pd.DataFrame:
+        """
+        Balances the dataset by sampling non-interacting pairs to match
+        the number of interacting pairs.
+
+        Parameters
+        ----------
+        data : pd.DataFrame
+            The merged DataFrame of sequences and interactions.
+
+        Returns
+        -------
+        pd.DataFrame
+            The equilibrated DataFrame.
+        """
         data_interaction = data[data["interaction"] == 1]
         data_non_interaction = data[data["interaction"] == 0]
         n_interaction = data_interaction.shape[0]
-        # n_non_interaction = data_non_interaction.shape[0]
+        
         data_non_interaction_selected = data_non_interaction.sample(n_interaction, replace=False)
-        data_selected = pd.concat([data_interaction, data_non_interaction_selected])
-        x_data_ag = self.encoder.encode(data_selected["sequence_ag"], vector_size)
+        
+        return pd.concat([data_interaction, data_non_interaction_selected])
+
+    def getdata(self, vector_size: int) -> Tuple[List[np.ndarray], np.ndarray, int, int]:
+        """
+        Loads and prepares the full dataset for a machine learning model.
+
+        This is the main public method that orchestrates the data loading,
+        equilibration, and encoding process.
+
+        Parameters
+        ----------
+        vector_size : int
+            The desired length for each protein sequence vector. Sequences
+            will be truncated or padded to this size during encoding.
+
+        Returns
+        -------
+        X_data : list of np.ndarray
+            A list containing two NumPy arrays: one for the antibody
+            sequences and one for the antigen sequences.
+        y_data : np.ndarray
+            A NumPy array of interaction labels (0 or 1).
+        vector_size : int
+            The vector size used for encoding.
+        alphabet_size : int
+            The size of the encoding alphabet (e.g., number of unique amino acids).
+        
+        Examples
+        --------
+        >>> from modules.encoding import ProteinOneHotEncoder
+        >>> encoder = ProteinOneHotEncoder()
+        >>> dataset = EquilibratedDataset(encoder)
+        >>> X, y, vector_size, alphabet_size = dataset.getdata(vector_size=200)
+        >>> x_ab, x_ag = X
+        """
+        data = self._prepare_dataframes()
+        data_selected = self._equilibrate_data(data)
+        
         x_data_ab = self.encoder.encode(data_selected["sequence_ab"], vector_size)
+        x_data_ag = self.encoder.encode(data_selected["sequence_ag"], vector_size)
+        
         x_data_ab = np.array(x_data_ab, dtype=np.float32)
         x_data_ag = np.array(x_data_ag, dtype=np.float32)
+        
         X_data = [x_data_ab, x_data_ag]
-        y_data = data_selected["interaction"]
-        y_data = np.array(y_data, dtype=np.float32)
-        alphabet_size = x_data_ag[0].shape[1]
+        y_data = np.array(data_selected["interaction"], dtype=np.float32)
+        
+        # Get alphabet size from the encoded data
+        alphabet_size = x_data_ag.shape[2]
+        
         return X_data, y_data, vector_size, alphabet_size
 
 class DatasetFactory:
