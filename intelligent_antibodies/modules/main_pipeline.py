@@ -164,6 +164,15 @@ os.environ['TF_CPP_MIN_LOG_LEVEL'] = '1'
 
 #     # Convert the set to a list before returning
 #     return list(unique_sequences)
+
+import os
+
+vector_size = 200
+
+print(f"Current Working Directory: {os.getcwd()}")
+expected_path = os.path.abspath(f'../run/models/vae/vae-one-hot-{vector_size}-encoder.keras')
+print(f"Looking for file at: {expected_path}")
+print(f"File exists: {os.path.exists(expected_path)}")
     
 if __name__ == "__main__":
     
@@ -180,12 +189,13 @@ if __name__ == "__main__":
     input_dimensions = (vector_size, alphabet_size)
 
     vae_full = VAEFull(200, 18)
-    vae_full.vae.reload(f'../run/vae-one-hot-{vector_size}.keras')
+    
+    vae_full.vae.reload(f'../run/models/vae/vae-one-hot-{vector_size}')
     
     seq_input1 = layers.Input(shape=input_dimensions, name='seq_ag')    
     seq_input2 = layers.Input(shape=input_dimensions, name='seq_ab')
     
-    siamese = keras.models.load_model(f'../run/models/siamese/one-hot-{vector_size}-model.h5', custom_objects=dict(f1=f1, mcc=mcc, binary_crossentropy=binary_crossentropy, forward=forward, accuracy=accuracy))
+    siamese = keras.models.load_model(f'../run/models/vae/one-hot-{vector_size}-model.h5', custom_objects=dict(f1=f1, mcc=mcc, binary_crossentropy=binary_crossentropy, forward=forward, accuracy=accuracy))
     
     antigen_seq_id = "6xe1"
 

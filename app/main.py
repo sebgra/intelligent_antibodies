@@ -41,7 +41,7 @@ col1, col2, col3 = st.columns([0.2,0.15, 0.85], gap="small", vertical_alignment=
 with st.container():
 
     with col2:
-        st.image("graphics/logo.png", width=200)
+        st.image("./app/graphics/logo.png", width=200)
 
     with col3:
         st.markdown("<h2 style='color: #008080;'>Intelligent Antibodies</h2>", unsafe_allow_html=True)

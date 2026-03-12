@@ -1,0 +1,16 @@
+[project]
+name = "intelligent_antibodies"
+version = "0.1.0"
+description = "Intelligent Antibodies: A Deep Learning Approach to Predicting Antibody-Antigen Interactions"
+readme = "README.md"
+requires-python = "==3.12.*"
+dependencies = [
+    "keras>=3.13.2",
+    "matplotlib>=3.10.8",
+    "numpy>=2.4.3",
+    "pandas<3",
+    "scikit-learn>=1.8.0",
+    "streamlit>=1.40.0",
+    "tensorflow>=2.21.0",
+    "torch>=2.10.0",
+]
