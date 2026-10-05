@@ -25,7 +25,10 @@ import streamlit as st
 from intelligent_antibodies.modules.main_pipeline import load_models
 from intelligent_antibodies.modules.utils.encoding import ProteinOneHotEncoder
 from intelligent_antibodies.modules.utils.inference import generate_antibody_sequence, test_interaction
-from intelligent_antibodies.modules.utils.paths import trained_models_available
+from intelligent_antibodies.modules.utils.paths import (
+    available_vector_sizes,
+    trained_models_available,
+)
 
 from mock_results import (
     GenerationRun,
@@ -40,6 +43,14 @@ def models_available(vector_size: int = 200) -> bool:
     return trained_models_available(vector_size)
 
 
+def trained_vector_sizes() -> list[int]:
+    """Sequence lengths the dashboard can actually run real models for."""
+    return available_vector_sizes()
+
+
+# Keyed on vector_size, so switching the requested sequence length loads (and
+# caches separately) the weights trained for that window rather than reusing
+# a model of the wrong input width.
 @st.cache_resource(show_spinner="Loading trained models...")
 def _cached_models(vector_size: int = 200) -> Dict:
     return load_models(vector_size)
@@ -125,5 +136,6 @@ def generate_candidates_real(
         candidates=passed,
         pool=pool.drop(columns="passed"),
         elapsed_seconds=time.time() - t0,
+        vector_size=vector_size,
         model_tag=f"real (trained weights, run/models/, vector_size={vector_size})",
     )

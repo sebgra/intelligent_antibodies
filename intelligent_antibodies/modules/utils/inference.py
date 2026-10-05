@@ -60,9 +60,9 @@ def generate_antibody_sequence(
     Notes
     -----
     The VAE decoder is assumed to have a latent space dimension of 2. The
-    `x_reconst` output is reshaped to (200, 18), implying that the generated
-    sequences have a length of 200 and an alphabet size matching the
-    encoder's alphabet (22 letters, see `encoding.AMINO_ACID_ALPHABET`).
+    `x_reconst` output is reshaped to (`vector_size`, alphabet size), i.e. the
+    generated sequences are `vector_size` long and use the encoder's own
+    alphabet (22 letters, see `encoding.AMINO_ACID_ALPHABET`).
     """
 
     z: tf.Tensor = temperature * tf.random.normal(shape=[n, 2])

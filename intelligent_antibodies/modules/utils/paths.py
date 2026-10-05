@@ -40,3 +40,19 @@ def trained_models_available(vector_size: int = 200) -> bool:
         and vae_base.with_name(vae_base.name + "-decoder.keras").exists()
         and siamese_weights_path(vector_size).exists()
     )
+
+
+def available_vector_sizes() -> list[int]:
+    """
+    Every vector size with a complete set of trained weights on disk.
+
+    Weight files are named per vector size (see the two path helpers above),
+    so the sizes that can actually be loaded are whatever has been trained.
+    Lets a caller -- e.g. the dashboard's sequence-length control -- say which
+    sizes are usable instead of silently falling back to simulated results.
+    """
+    sizes = {
+        int(stem) for p in VAE_MODEL_DIR.glob("vae-one-hot-*-encoder.keras")
+        if (stem := p.name[len("vae-one-hot-"):-len("-encoder.keras")]).isdigit()
+    }
+    return sorted(s for s in sizes if trained_models_available(s))

@@ -20,8 +20,9 @@ than inventing unrelated metrics:
   takes the argmax -- samples drawn further from the training prior (large
   `temperature`, large ``||z||``) are modelled as decoding less confidently,
   which is the real trade-off a sampling-temperature knob controls.
-- Sequence length is capped at `VECTOR_SIZE` (200), matching the
-  `vector_size` used throughout `VAEFull` / `main_pipeline.py`.
+- Sequence length is capped at the caller's `vector_size` (default
+  `VECTOR_SIZE`, 200), the same encoding window `VAEFull` /
+  `main_pipeline.py` are built around.
 
 Swapping `generate_candidates()` for a real call into
 `get_unique_interacting_antibodies()` (now temperature-aware) is the
@@ -124,6 +125,7 @@ class GenerationRun:
     candidates: pd.DataFrame      # the n_requested (or fewer) that passed
     pool: pd.DataFrame            # every sampled point, pass or fail
     elapsed_seconds: float
+    vector_size: int = VECTOR_SIZE   # encoding window / requested sequence length
     model_tag: str = "mock-generator-v0 (VAE+Siamese not yet connected)"
     timestamp: float = field(default_factory=time.time)
 
@@ -179,8 +181,9 @@ def generate_candidates(
     threshold: float = 0.80,
     temperature: float = 1.0,
     seed: Optional[int] = None,
-    min_length: int = 105,
-    max_length: int = 135,
+    min_length: Optional[int] = None,
+    max_length: Optional[int] = None,
+    vector_size: int = VECTOR_SIZE,
 ) -> GenerationRun:
     """
     Simulate a batch antibody-generation run against a given antigen.
@@ -206,8 +209,13 @@ def generate_candidates(
         the parameter added to `inference.generate_antibody_sequence`.
     seed : int, optional
         RNG seed. A fresh run should omit this so results vary per click.
-    min_length, max_length : int
-        Bounds on simulated antibody sequence length (always <= VECTOR_SIZE).
+    min_length, max_length : int, optional
+        Bounds on simulated antibody sequence length. Omitted (the default),
+        they scale with `vector_size`; either way they are clamped to it.
+    vector_size : int
+        The one-hot encoding window the real models would use, i.e. the
+        requested generated-sequence length. Simulated sequences never
+        exceed it, since the real encoder truncates at that width.
 
     Returns
     -------
@@ -239,7 +247,12 @@ def generate_candidates(
         0.96 - 0.11 * dist_from_origin + rng.normal(0, 0.04, size=pool_size), 0.15, 0.99
     )
 
-    lengths = rng.integers(min_length, min(max_length, VECTOR_SIZE) + 1, size=pool_size)
+    # Default bounds track the encoding window: the 0.52-0.68 ratios reproduce
+    # the previous fixed 105-135 aa range at the default 200 aa window (roughly
+    # a real antibody chain), and stay proportionate for any other window.
+    hi = min(max_length if max_length is not None else round(0.68 * vector_size), vector_size)
+    lo = min(min_length if min_length is not None else round(0.52 * vector_size), hi)
+    lengths = rng.integers(max(lo, 1), hi + 1, size=pool_size)
     sequences = [_random_sequence(rng, int(length)) for length in lengths]
 
     pool = pd.DataFrame({
@@ -282,6 +295,8 @@ def generate_candidates(
         candidates=passed,
         pool=pool,
         elapsed_seconds=max(elapsed, 0.3),
+        vector_size=vector_size,
+        model_tag=f"mock-generator-v0 (VAE+Siamese not yet connected, vector_size={vector_size})",
     )
 
 
@@ -408,3 +423,19 @@ def colorize_sequence_html(sequence: str, width: int = 60) -> str:
         '<div style="font-family:ui-monospace,SFMono-Regular,Consolas,monospace;'
         'font-size:0.85rem;line-height:1.6;overflow-x:auto;">' + "".join(rows) + "</div>"
     )
+
+
+if __name__ == "__main__":
+    # Self-check: generated lengths must honour the requested window, including
+    # windows smaller than the old fixed 105-135 aa range.
+    for vs in (30, 200, 450):
+        run = generate_candidates("ACDEFGHIKL", n_requested=10, seed=1, vector_size=vs)
+        assert run.pool["length"].max() <= vs, (vs, run.pool["length"].max())
+        assert run.pool["length"].min() >= 1
+        assert run.pool["sequence"].map(len).equals(run.pool["length"]), vs
+        assert f"vector_size={vs}" in run.model_tag
+        assert run.vector_size == vs
+    # Explicit bounds are still clamped to the window.
+    run = generate_candidates("ACDEFGHIKL", seed=1, vector_size=50, min_length=105, max_length=135)
+    assert run.pool["length"].max() <= 50
+    print("mock_results self-check OK")

@@ -55,7 +55,7 @@ uv run streamlit run app/main.py
 
 This is the [Quickstart](#quickstart) above. Worth doing first regardless of whether you plan to train real models — it's the fastest way to see what every tab does:
 
-- **Generate** — pick an antigen (type a sequence, check the example box, or upload a FASTA file), and set the candidate count, interaction-score threshold, and latent-space sampling temperature.
+- **Generate** — pick an antigen (type a sequence, check the example box, or upload a FASTA file), and set the candidate count, interaction-score threshold, latent-space sampling temperature, and generated sequence length (the `vector_size` encoding window, 200 aa by default). Weights are stored per sequence length, so the dashboard loads the models trained for the length you pick — if none exist for it, it says which lengths are trained and falls back to simulated results.
 - **Results → Overview** — KPIs, the score distribution across the sampled pool, and the top candidates.
 - **Results → Latent space** — every sampled point in the VAE's 2-D latent space. **Drag a box or lasso** over a cluster of points to filter the other tabs down to just that selection.
 - **Results → Sequence analysis** — length, hydrophobicity, and charge statistics, plus colorized sequences (by physicochemical residue class).

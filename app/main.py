@@ -273,7 +273,7 @@ with tab_generate:
             key="antigen_fasta_uploader", label="Choose a FASTA file", accept_multiple_files=False
         )
 
-        col_a, col_b = st.columns(2)
+        col_a, col_b, col_c = st.columns(3)
         with col_a:
             n_requested = st.slider("Candidates to return", min_value=5, max_value=50, value=20, step=5)
         with col_b:
@@ -282,6 +282,16 @@ with tab_generate:
                 help="Same threshold as inference.test_interaction: a candidate is kept only if "
                      "the Siamese classifier's sigmoid score exceeds this value.",
             )
+        with col_c:
+            vector_size = int(st.number_input(
+                "Sequence length (aa)", min_value=20, max_value=1000,
+                value=VECTOR_SIZE, step=10,
+                help="The one-hot encoding window (`vector_size`): the length of the generated "
+                     "sequences and the input width of both models. Weights are stored per "
+                     "length, so changing this loads the model trained for that length "
+                     "(train one with `--vector-size <length>`); lengths without trained "
+                     "weights fall back to simulated results.",
+            ))
 
         temperature = st.slider(
             "Sampling temperature", min_value=0.2, max_value=2.0, value=1.0, step=0.1,
@@ -296,21 +306,31 @@ with tab_generate:
         elif temperature > 1.4:
             st.caption("🟠 Exploratory sampling — expect more diverse but less confident decodes.")
 
-        with st.expander("Encoding settings (fixed by the trained model)"):
+        with st.expander("Encoding settings"):
             st.caption(
-                f"One-hot encoding · {VECTOR_SIZE} aa window · {ALPHABET_SIZE}-letter alphabet · "
+                f"One-hot encoding · {vector_size} aa window · {ALPHABET_SIZE}-letter alphabet · "
                 "VAE latent dim 2 · Siamese CNN+GRU classifier "
                 "(see intelligent_antibodies/modules/models/)"
             )
 
-        use_real = real_pipeline.models_available(VECTOR_SIZE)
+        use_real = real_pipeline.models_available(vector_size)
         if use_real:
-            st.success("✅ Trained models found under `run/models/` — generation will use them.")
+            st.success(
+                f"✅ Trained models for a {vector_size} aa window found under `run/models/` — "
+                "generation will use them."
+            )
         else:
-            st.info(
-                "ℹ️ No trained models found under `run/models/` — showing **simulated** results. "
-                "Run `scripts/train_vae.py` and `scripts/train_siamese.py` to train real ones "
+            trained = real_pipeline.trained_vector_sizes()
+            hint = (
+                f" Trained weights exist for {', '.join(f'{s} aa' for s in trained)} — set the "
+                "sequence length to one of those to run the real models."
+                if trained else
+                " Run `scripts/train_vae.py` and `scripts/train_siamese.py` to train real ones "
                 "(see README.md, \"Training the models\")."
+            )
+            st.info(
+                f"ℹ️ No trained models for a {vector_size} aa window under `run/models/` — "
+                "showing **simulated** results." + hint
             )
 
         launch = st.button("🚀 Launch generation", type="primary")
@@ -343,11 +363,12 @@ with tab_generate:
             if use_real:
                 run = real_pipeline.generate_candidates_real(
                     sequence, n_requested=n_requested, threshold=threshold,
-                    temperature=temperature, vector_size=VECTOR_SIZE,
+                    temperature=temperature, vector_size=vector_size,
                 )
             else:
                 run = generate_candidates_mock(
-                    sequence, n_requested=n_requested, threshold=threshold, temperature=temperature
+                    sequence, n_requested=n_requested, threshold=threshold,
+                    temperature=temperature, vector_size=vector_size,
                 )
             progress.empty()
             st.session_state["run"] = run
@@ -381,12 +402,13 @@ with tab_results:
                 unsafe_allow_html=True,
             )
 
-        meta_cols = st.columns(5)
+        meta_cols = st.columns(6)
         meta_cols[0].caption(f"**Antigen length**  \n{len(run.antigen_sequence)} aa")
         meta_cols[1].caption(f"**Candidates requested**  \n{run.n_requested}")
-        meta_cols[2].caption(f"**Pool sampled**  \n{run.n_pool_generated}")
-        meta_cols[3].caption(f"**Temperature**  \n{run.temperature:.1f}")
-        meta_cols[4].caption(f"**Generation time**  \n{run.elapsed_seconds:.1f} s")
+        meta_cols[2].caption(f"**Sequence length**  \n{run.vector_size} aa window")
+        meta_cols[3].caption(f"**Pool sampled**  \n{run.n_pool_generated}")
+        meta_cols[4].caption(f"**Temperature**  \n{run.temperature:.1f}")
+        meta_cols[5].caption(f"**Generation time**  \n{run.elapsed_seconds:.1f} s")
 
         df = run.candidates
         pool = run.pool
@@ -865,7 +887,7 @@ with tab_data:
         d3.metric("Antigen chains", int((seq_df["seq_type"] == "ag").sum()))
         d4.metric("Labeled ab/ag pairs", len(match_df))
 
-        over_cutoff = (seq_df["length"] > VECTOR_SIZE).mean() * 100
+        over_cutoff = (seq_df["length"] > vector_size).mean() * 100
 
         dcol1, dcol2 = st.columns(2)
         with dcol1:
@@ -878,13 +900,13 @@ with tab_data:
                 )
             )
             fig_len.add_vline(
-                x=VECTOR_SIZE, line=dict(color=STATUS_CRITICAL, dash="dash", width=2),
-                annotation_text=f"model window = {VECTOR_SIZE} aa", annotation_position="top right",
+                x=vector_size, line=dict(color=STATUS_CRITICAL, dash="dash", width=2),
+                annotation_text=f"model window = {vector_size} aa", annotation_position="top right",
             )
             fig_len.update_layout(xaxis_title="Sequence length (aa)", yaxis_title="Count")
             st.plotly_chart(_plotly_base_layout(fig_len), width="stretch")
             st.caption(
-                f"{over_cutoff:.1f}% of sequences exceed the model's {VECTOR_SIZE} aa encoding "
+                f"{over_cutoff:.1f}% of sequences exceed the model's {vector_size} aa encoding "
                 "window and are truncated by `ProteinOneHotEncoder`."
             )
 
@@ -929,7 +951,7 @@ with tab_data:
             f"Conv2D(32) → Conv2D(64), stride 2 each → Dense(16) → "
             f"z_mean / z_log_var → latent dim **{2}** → "
             "Dense → Reshape → Conv2DTranspose ×2 → sigmoid reconstruction. "
-            f"Operates on a ({VECTOR_SIZE} × {ALPHABET_SIZE} × 1) one-hot image per sequence."
+            f"Operates on a ({vector_size} × {ALPHABET_SIZE} × 1) one-hot image per sequence."
         )
     with arch_col2:
         st.markdown("**Discriminator — Siamese classifier** (`models/SiameseInteractionClassifier.py`)")
