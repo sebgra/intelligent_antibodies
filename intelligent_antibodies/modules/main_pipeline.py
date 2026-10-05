@@ -1,209 +1,157 @@
-from typing import Tuple, Generator, List
+"""
+End-to-end antibody-generation pipeline: given a target antigen, sample
+candidate antibody sequences from the trained VAE and keep the ones the
+trained Siamese classifier predicts will interact with that antigen.
+
+This is the "real" counterpart to `app/mock_results.py`'s mock generator --
+see `app/real_pipeline.py` for how the dashboard calls into it once trained
+weights are available under `run/models/` (see README.md, "Training the
+models", for how to produce them).
+
+CLI usage
+---------
+    uv run python -m intelligent_antibodies.modules.main_pipeline \\
+        --antigen-id 6xe1 --n-candidates 20 --threshold 0.8 --temperature 1.0
+"""
+import argparse
+from typing import Dict, List, Optional
+
 import keras
-from keras import layers
-import matplotlib.pyplot as plt
-import tensorflow as tf
-from tensorflow import Tensor
-
-
-from models.VAE import VAE
-from models.VAEFull import VAEFull
-from models.SiameseInteractionClassifier import f1, binary_crossentropy, mcc, forward, accuracy
-from utils.encoding import ProteinOneHotEncoder
-from utils.inference import get_unique_interacting_antibodies
-
 import pandas as pd
-import numpy as np
+import tensorflow as tf
+from keras import layers
 
-import os
-os.environ['TF_CPP_MIN_LOG_LEVEL'] = '1' 
-
-# def generate_antibody_sequence(n: int, vector_size: int) -> Generator[Tuple[str, Tensor], None, None]:
-#     """
-#     Generate novel protein sequences by sampling from the VAE's latent space.
-
-#     This function leverages the trained VAE decoder to reconstruct new protein
-#     sequences by sampling points from a standard normal distribution in the
-#     latent space. It then decodes these numerical representations back into
-#     amino acid sequences and re-encodes them.
-
-#     Parameters
-#     ----------
-#     n : int
-#         The number of sequences to generate.
-#     vector_size : int
-#         The size of the vector representation for each sequence. This must match
-#         the input size of the VAE decoder.
-
-#     Yields
-#     ------
-#     Tuple[str, Tensor]
-#         A generator that yields a tuple for each generated sequence, containing:
-#         - The generated protein sequence as a string.
-#         - The one-hot encoded representation of the generated sequence.
-
-#     Notes
-#     -----
-#     The VAE decoder is assumed to have a latent space dimension of 2. The
-#     `x_reconst` output is reshaped to (200, 18), implying that the generated
-#     sequences have a length of 200 and an alphabet size of 18.
-#     """
-    
-#     z: tf.Tensor = tf.random.normal(shape=[n, 2])
-#     x_reconst: np.array = vae_full.decoder.predict(z, verbose=0)
-#     latent_dim: int = z.shape[1]
-#     for x in x_reconst:
-#         x_sample: np.array = x.reshape((200, 18))
-#         protein_sequence:str = "".join(list(encoder.decode(x_sample)))
-#         protein_onehot: tf.Tensor = encoder.encode([protein_sequence], vector_size)
-#         yield protein_sequence, protein_onehot
-
-# def generate_interacting_antibody(antigen: str, limit: int=20): 
-#     """
-#         Generates antibody sequences predicted to interact with a given antigen.
-
-#         This function repeatedly generates a batch of antibody sequences using a
-#         generative model and tests each sequence for potential interaction with the
-#         provided antigen. It yields each successful antibody sequence as it is found.
-
-#         Parameters
-#         ----------
-#         antigen : str
-#             The antigen sequence to test against. Can be a string.
-#         limit : int, optional
-#             The number of generation batches to attempt before stopping.
-#             Each batch attempts to generate 10 candidate antibodies.
-#             The default is 20.
-
-#         Yields
-#         ------
-#         str
-#             A generated antibody sequence that is predicted to interact with the
-#             antigen.
-
-#         Notes
-#         -----
-#         The function relies on external components:
-#         - `encoder`: An object to encode sequences into numerical vectors.
-#         - `vector_size`: An integer for the encoded vector length.
-#         - `generate_antibody_sequence`: A generator function that produces candidate
-#         antibody sequences.
-#         - `test_interaction`: A function that predicts interaction between two
-#         one-hot encoded sequences.
-
-#         Examples
-#         --------
-#         >>> # Assuming 'antigen_seq' is a defined antigen string
-#         >>> interacting_antibodies = generate_interacting_antibody(antigen_seq, limit=50)
-#         >>> for antibody in interacting_antibodies:
-#         ...     print(f"Found interacting antibody: {antibody}")
-#         """
-        
-#     if isinstance(antigen, str):
-#         antigen = pd.Series(antigen)
-#     onehot_antigen = encoder.encode(antigen, vector_size)
-#     for _ in range(limit):
-#         for sequence_antibody, onehot_antibody in generate_antibody_sequence(10, vector_size):
-#             if test_interaction(onehot_antibody, onehot_antigen):
-#                 yield sequence_antibody
+from intelligent_antibodies.modules.models.SiameseInteractionClassifier import (
+    accuracy, binary_crossentropy, f1, mcc,
+)
+from intelligent_antibodies.modules.models.VAEFull import VAEFull
+from intelligent_antibodies.modules.utils.encoding import ProteinOneHotEncoder
+from intelligent_antibodies.modules.utils.inference import get_unique_interacting_antibodies
+from intelligent_antibodies.modules.utils.paths import SABDAB_DIR, siamese_weights_path, vae_weights_path
 
 
-# def test_interaction(onehot_antibody: tf.Tensor, onehot_antigen: tf.Tensor, threshold: float =0.8) -> tf.Tensor:
-#     """
-#     Test if there is an interaction between antibody and antigene
-#     both being one hot encoded.
+def _limit_gpu_memory(mb: int = 5120) -> None:
+    gpus = tf.config.experimental.list_physical_devices("GPU")
+    if not gpus:
+        return
+    try:
+        tf.config.experimental.set_virtual_device_configuration(
+            gpus[0], [tf.config.experimental.VirtualDeviceConfiguration(memory_limit=mb)]
+        )
+    except RuntimeError as exc:
+        print(f"Could not set GPU memory limit ({exc}); continuing with default config.")
 
-#     Parameters
-#     ----------
-#     onehot_antibody : tf.Tensor
-#         One hot encoded antibody to be tested.
-#     onehot_antigen : tf.Tensor
-#         One hot encoded antigene to be tested.
-#     threshold : float, optional
-#         Threshold beyond which interaction between antibody and antigene is considered as real, by default 0.8
 
-#     Returns
-#     -------
-#     tf.Tensor
-#         Return 0.0 if no interaction, 1.0 otherwise.
-#     """        
-#     score = siamese.predict([onehot_antibody, onehot_antigen], verbose = 0)
-#     label = tf.cast(score > threshold, tf.int32)
-#     return label[0][0]
+def load_models(vector_size: int = 200) -> Dict:
+    """Load the trained VAE decoder and Siamese classifier from `run/models/`."""
+    _limit_gpu_memory()
 
-# def get_unique_interacting_antibodies(antigen: str, limit: int = 20) -> List[str]:
-#     """
-#     Generates and returns a list of unique antibody sequences predicted to
-#     interact with a given antigen.
+    # Derived from the encoder itself (22 letters, see encoding.AMINO_ACID_ALPHABET)
+    # rather than hardcoded, so it can't silently drift out of sync with it.
+    alphabet_size = len(ProteinOneHotEncoder().alphabet)
+    vae_full = VAEFull(vector_size, alphabet_size)
+    vae_full.vae.reload(str(vae_weights_path(vector_size)))
 
-#     This function calls a generative model to produce candidate antibody sequences,
-#     iterates through them, and collects all unique sequences into a list. The
-#     process stops after a certain number of generation attempts.
+    siamese_path = siamese_weights_path(vector_size)
+    siamese = keras.models.load_model(
+        str(siamese_path),
+        custom_objects=dict(f1=f1, mcc=mcc, binary_crossentropy=binary_crossentropy, accuracy=accuracy),
+    )
+    return {"vae_full": vae_full, "siamese": siamese}
 
-#     Parameters
-#     ----------
-#     antigen : str
-#         The antigen sequence to be tested against.
-#     limit : int, optional
-#         The number of generation batches to attempt before stopping. Each batch
-#         produces multiple candidate antibodies. The default is 20.
 
-#     Returns
-#     -------
-#     List[str]
-#         A list of unique antibody sequences predicted to interact with the antigen.
-#         The list may be empty if no interacting antibodies are found within the
-#         given limit.
-#     """
-#     # Use a set to efficiently store and enforce uniqueness
-#     unique_sequences = set()
+def load_antigen_sequence(antigen_seq_id: str) -> str:
+    """Look up an antigen's sequence by id (e.g. "6xe1") in sequences.csv."""
+    df_seq = pd.read_csv(SABDAB_DIR / "sequences.csv", sep=";")
+    matches = df_seq[df_seq["seq_id"] == f"{antigen_seq_id}|ag"]
+    if matches.empty:
+        raise ValueError(f"No antigen found for id {antigen_seq_id!r} in {SABDAB_DIR / 'sequences.csv'}")
+    return matches["sequence"].iloc[0]
 
-#     # Iterate through the generator from generate_interacting_antibody
-#     for sequence in generate_interacting_antibody(antigen, limit):
-#         unique_sequences.add(sequence)
 
-#     # Convert the set to a list before returning
-#     return list(unique_sequences)
+def run_pipeline(
+    antigen_sequence: str,
+    models: Optional[Dict] = None,
+    vector_size: int = 200,
+    n_candidates: int = 20,
+    threshold: float = 0.8,
+    temperature: float = 1.0,
+    limit: int = 20,
+) -> List[Dict]:
+    """
+    Generate up to `n_candidates` antibody sequences predicted to interact
+    with `antigen_sequence`, using the trained VAE + Siamese models.
 
-import os
+    Parameters
+    ----------
+    antigen_sequence : str
+        The target antigen's amino-acid sequence.
+    models : dict, optional
+        Pre-loaded models from `load_models()`. If omitted, they are loaded
+        from `run/models/` (slow -- prefer loading once and reusing across calls).
+    n_candidates : int
+        Maximum number of ranked candidates to return.
+    threshold : float
+        Minimum Siamese interaction score (0-1) for a candidate to be kept.
+    temperature : float
+        Latent-space sampling temperature (``z = temperature * N(0, 1)``).
+    limit : int
+        Number of generation batches to attempt (each batch samples 10
+        candidates); raise this if too few candidates clear `threshold`.
 
-vector_size = 200
+    Returns
+    -------
+    List[dict]
+        Candidates as ``{"sequence", "score", "z1", "z2", "decode_confidence"}``,
+        ranked by score descending. May be shorter than `n_candidates` (or
+        empty) if few/no candidates cleared `threshold` within `limit` batches.
+    """
+    if models is None:
+        models = load_models(vector_size)
 
-print(f"Current Working Directory: {os.getcwd()}")
-expected_path = os.path.abspath(f'../run/models/vae/vae-one-hot-{vector_size}-encoder.keras')
-print(f"Looking for file at: {expected_path}")
-print(f"File exists: {os.path.exists(expected_path)}")
-    
-if __name__ == "__main__":
-    
-    gpus = tf.config.experimental.list_physical_devices('GPU')
-    if gpus:
-        try:
-            tf.config.experimental.set_virtual_device_configuration(
-                gpus[0],[tf.config.experimental.VirtualDeviceConfiguration(memory_limit=5120)])
-        except RuntimeError as e:
-            print(e)
-            
-    vector_size = 200
-    alphabet_size = 18
-    input_dimensions = (vector_size, alphabet_size)
-
-    vae_full = VAEFull(200, 18)
-    
-    vae_full.vae.reload(f'../run/models/vae/vae-one-hot-{vector_size}')
-    
-    seq_input1 = layers.Input(shape=input_dimensions, name='seq_ag')    
-    seq_input2 = layers.Input(shape=input_dimensions, name='seq_ab')
-    
-    siamese = keras.models.load_model(f'../run/models/vae/one-hot-{vector_size}-model.h5', custom_objects=dict(f1=f1, mcc=mcc, binary_crossentropy=binary_crossentropy, forward=forward, accuracy=accuracy))
-    
-    antigen_seq_id = "6xe1"
-
-    df_seq = pd.read_csv("../../data/SAbDab/sequences.csv", sep=";")
-    antigen = df_seq[df_seq["seq_id"] == f"{antigen_seq_id}|ag"]
-
-    antigen_sequence = antigen["sequence"]
     encoder = ProteinOneHotEncoder()
-    
-    candidates = get_unique_interacting_antibodies(antigen = antigen_sequence, encoder= encoder, vae_model=vae_full, siamese_model=siamese, limit = 20)
-    print(candidates)
+    return get_unique_interacting_antibodies(
+        antigen=antigen_sequence,
+        encoder=encoder,
+        vae_model=models["vae_full"].vae,
+        siamese_model=models["siamese"],
+        limit=limit,
+        temperature=temperature,
+        threshold=threshold,
+        max_candidates=n_candidates,
+    )
+
+
+def _parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--antigen-id", default="6xe1",
+                         help="SAbDab seq_id (without |ag) of the target antigen, looked up in "
+                              "data/SAbDab/sequences.csv.")
+    parser.add_argument("--n-candidates", type=int, default=20)
+    parser.add_argument("--threshold", type=float, default=0.8)
+    parser.add_argument("--temperature", type=float, default=1.0)
+    parser.add_argument("--limit", type=int, default=20,
+                         help="Number of 10-candidate generation batches to attempt.")
+    parser.add_argument("--vector-size", type=int, default=200)
+    return parser.parse_args()
+
+
+def main() -> None:
+    args = _parse_args()
+    antigen_sequence = load_antigen_sequence(args.antigen_id)
+    print(f"Loaded antigen {args.antigen_id!r} ({len(antigen_sequence)} aa).")
+
+    models = load_models(args.vector_size)
+    candidates = run_pipeline(
+        antigen_sequence, models=models, vector_size=args.vector_size,
+        n_candidates=args.n_candidates,
+        threshold=args.threshold, temperature=args.temperature, limit=args.limit,
+    )
+
+    print(f"Generated {len(candidates)} candidate(s) above threshold {args.threshold}:")
+    for c in candidates:
+        print(f"  score={c['score']:.3f}  z=({c['z1']:.2f}, {c['z2']:.2f})  {c['sequence']}")
+
+
+if __name__ == "__main__":
+    main()

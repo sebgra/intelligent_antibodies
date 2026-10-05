@@ -7,6 +7,8 @@ import pandas as pd
 import tensorflow as tf
 import itertools
 
+from intelligent_antibodies.modules.utils.paths import DATA_DIR
+
 AMINO_ACID_ALPHABET = "ARNDCQEGHILKMFPSTWYVXU"
 
 class ProteinOneHotEncoder:
@@ -102,7 +104,7 @@ class ProteinOneHotEncoder:
 
 class NLFEncoder:
     def __init__(self, ):
-        self.nlf = pd.read_csv('../data/NLF.csv', index_col=0)
+        self.nlf = pd.read_csv(DATA_DIR / 'NLF.csv', index_col=0)
         # The letter X will represent an empty position (added in case we might encounter empty spots somewhere)
         self.nlf['X'] = [0.0] * self.nlf.shape[0]
         # If we encounter Selenocysteine, we'll treat it as Cysteine
@@ -157,7 +159,7 @@ class NLFEncoder:
 
 class BLOSUMEncoder:
     def __init__(self):
-        self.blosum = pd.read_csv('../data/blosum62.csv', index_col=0)
+        self.blosum = pd.read_csv(DATA_DIR / 'blosum62.csv', index_col=0)
         # If we encounter Selenocysteine, we'll treat it as Cysteine
         self.blosum['U'] = self.blosum['C']
         self.decoder = {tuple(self.blosum[letter]): letter for letter in self.blosum.columns}

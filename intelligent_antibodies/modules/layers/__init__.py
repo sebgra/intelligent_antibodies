@@ -1,2 +1,2 @@
-from layers.SamplingLayer import SamplingLayer
-from layers.VariationalLossLayer import VariationalLossLayer
+from intelligent_antibodies.modules.layers.SamplingLayer import SamplingLayer
+from intelligent_antibodies.modules.layers.VariationalLossLayer import VariationalLossLayer

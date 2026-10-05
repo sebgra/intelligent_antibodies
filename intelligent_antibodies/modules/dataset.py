@@ -5,7 +5,8 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 
-from . import encoding
+from intelligent_antibodies.modules.utils import encoding
+from intelligent_antibodies.modules.utils.paths import SABDAB_DIR
 
 from sklearn.preprocessing import OrdinalEncoder
 
@@ -27,8 +28,8 @@ class EquilibratedDataset:
 
     def __init__(self, encoder: Any):
         self.encoder = encoder
-        self.df_seq = pd.read_csv("../data/SAbDab/sequences.csv", sep=";")
-        self.df_match = pd.read_csv("../data/SAbDab/data_filtered.csv", sep=";")
+        self.df_seq = pd.read_csv(SABDAB_DIR / "sequences.csv", sep=";")
+        self.df_match = pd.read_csv(SABDAB_DIR / "data_filtered.csv", sep=";")
 
     def _prepare_dataframes(self) -> pd.DataFrame:
         """
@@ -101,7 +102,7 @@ class EquilibratedDataset:
         
         Examples
         --------
-        >>> from modules.encoding import ProteinOneHotEncoder
+        >>> from intelligent_antibodies.modules.utils.encoding import ProteinOneHotEncoder
         >>> encoder = ProteinOneHotEncoder()
         >>> dataset = EquilibratedDataset(encoder)
         >>> X, y, vector_size, alphabet_size = dataset.getdata(vector_size=200)
@@ -129,7 +130,7 @@ class DatasetFactory:
         self.encoder = encoder
 
     def get_data(self):
-        df_seq = pd.read_csv("../data/SAbDab/sequences.csv", sep=";")
+        df_seq = pd.read_csv(SABDAB_DIR / "sequences.csv", sep=";")
         df_seq[["seq_rcpb", "seq_type"]] = df_seq["seq_id"].str.split('|',  n=1, expand=True)
         ordinal_encoder = OrdinalEncoder()
         enc_seq_type = ordinal_encoder.fit_transform(df_seq[["seq_type"]])
@@ -138,11 +139,12 @@ class DatasetFactory:
         X_data = seq_encoded
         y_data = enc_seq_type
         return X_data, y_data, X_data.shape[0], X_data.shape[1]
-    
+
+
 class OneHotProtDataset:
+    @staticmethod
     def get_data(vector_size=1500):
-        # df_match = pd.read_csv("../data/SAbDab/data.csv", sep=";")
-        df_seq = pd.read_csv("../data/SAbDab/sequences.csv", sep=";")
+        df_seq = pd.read_csv(SABDAB_DIR / "sequences.csv", sep=";")
         df_seq[["seq_rcpb", "seq_type"]] = df_seq["seq_id"].str.split('|',  n=1, expand=True)
         ordinal_encoder = OrdinalEncoder()
         enc_seq_type = ordinal_encoder.fit_transform(df_seq[["seq_type"]])
@@ -153,13 +155,14 @@ class OneHotProtDataset:
         y_data = enc_seq_type
         alphabet_size = len(encoding.AMINO_ACID_ALPHABET)
         return X_data, y_data, vector_size, alphabet_size
-    
+
 
 class AntibodyOneHotProtDataset:
+    @staticmethod
     def get_data(vector_size):
-        df_seq = pd.read_csv("../data/SAbDab/sequences.csv", sep=";")
+        df_seq = pd.read_csv(SABDAB_DIR / "sequences.csv", sep=";")
         df_seq[["seq_rcpb", "seq_type"]] = df_seq["seq_id"].str.split('|',  n=1, expand=True)
-        df_seq = df_seq[df_seq["seq_type"] == "ab"] 
+        df_seq = df_seq[df_seq["seq_type"] == "ab"]
         ordinal_encoder = OrdinalEncoder()
         enc_seq_type = ordinal_encoder.fit_transform(df_seq[["seq_type"]])
         seq = df_seq["sequence"]
@@ -172,10 +175,11 @@ class AntibodyOneHotProtDataset:
 
 
 class AntibodyNLFProtDataset:
+    @staticmethod
     def get_data(vector_size):
-        df_seq = pd.read_csv("../data/SAbDab/sequences.csv", sep=";")
+        df_seq = pd.read_csv(SABDAB_DIR / "sequences.csv", sep=";")
         df_seq[["seq_rcpb", "seq_type"]] = df_seq["seq_id"].str.split('|',  n=1, expand=True)
-        df_seq = df_seq[df_seq["seq_type"] == "ab"] 
+        df_seq = df_seq[df_seq["seq_type"] == "ab"]
         ordinal_encoder = OrdinalEncoder()
         enc_seq_type = ordinal_encoder.fit_transform(df_seq[["seq_type"]])
         seq = df_seq["sequence"]

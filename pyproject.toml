@@ -5,12 +5,26 @@ description = "Intelligent Antibodies: A Deep Learning Approach to Predicting An
 readme = "README.md"
 requires-python = "==3.12.*"
 dependencies = [
+    "biopython>=1.85",
     "keras>=3.13.2",
     "matplotlib>=3.10.8",
     "numpy>=2.4.3",
     "pandas<3",
+    "plotly>=7.1.0",
+    "requests>=2.32",
     "scikit-learn>=1.8.0",
     "streamlit>=1.40.0",
     "tensorflow>=2.21.0",
     "torch>=2.10.0",
+    "tqdm>=4.67",
 ]
+
+# Makes `intelligent_antibodies.modules.*` importable regardless of the
+# current working directory (installed editable into the project's venv by
+# `uv sync`), instead of relying on cwd-based implicit namespace packages.
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["intelligent_antibodies"]

@@ -1,7 +1,7 @@
 from keras import layers
 import keras
-from layers.SamplingLayer import SamplingLayer
-from models.VAE import VAE
+from intelligent_antibodies.modules.layers.SamplingLayer import SamplingLayer
+from intelligent_antibodies.modules.models.VAE import VAE
 
 class VAEFull:
 

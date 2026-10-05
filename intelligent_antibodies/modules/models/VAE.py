@@ -2,7 +2,7 @@ import keras
 import tensorflow as tf
 import os
 
-from layers import SamplingLayer
+from intelligent_antibodies.modules.layers import SamplingLayer
 
 class VAE(keras.Model):
     def __init__(self, encoder, decoder, **kwargs):

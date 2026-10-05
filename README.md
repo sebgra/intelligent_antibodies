@@ -1,31 +1,208 @@
-# Intelligent Antibodies
+<div align="center">
 
-Therapeutic (monoclonal) antibodies are one of the most effective therapies available today for the treatment of chronic inflammatory diseases such as Crohn's disease, lupus and multiple sclerosis. To treat the latter, monoclonal antibodies can target certain proteins involved in these pathologies with a view to neutralizing them, and can also be used to limit the supply of factors essential to tumor growth or disruptors of the tumor microenvironment. Monoclonal antibody-based serotherapy can also compensate for treatment shortfalls in the case of fulminant epidemics where the pathogens involved have a high mutability rate, such as COVID-19.
+# 🧬 Intelligent Antibodies
 
-Although promising and a major product on the pharmaceutical market, only around thirty monoclonal antibodies are currently available for chronic inflammatory diseases, and around ten for the treatment of cancer. This lack of comprehensiveness is due to the many difficulties inherent in the in-vitro and in-silico design of these therapeutic molecules. Antibody design and/or optimization remains a real challenge, not least because of the need to produce molecules that are effective, target-specific and deliverable to the organs being treated. The difficulties are also linked to long and costly development times.
+**A deep-learning pipeline for in-silico antibody design — sample candidate antibody sequences from a trained VAE, score them against a target antigen with a Siamese interaction classifier, and explore the results in an interactive dashboard.**
 
-In order to accelerate the development of therapeutic antibodies, in-silico methods have been developed to reduce modeling times for these molecules, while exploring design possibilities more exhaustively. Although advantageous, these methods currently rely essentially on estimating the affinity between the antibody and its target by calculating the binding energy, which remains difficult to estimate and extremely time-consuming from an experimental point of view.
+[![Python 3.12](https://img.shields.io/badge/python-3.12-blue.svg)](https://www.python.org/downloads/release/python-3120/)
+[![uv](https://img.shields.io/badge/managed%20with-uv-6340ac.svg)](https://docs.astral.sh/uv/)
+[![Streamlit](https://img.shields.io/badge/dashboard-Streamlit-ff4b4b.svg)](https://streamlit.io/)
+[![Status](https://img.shields.io/badge/status-research%20%2F%20WIP-orange.svg)](#project-status)
 
+[Quickstart](#quickstart) • [Tutorial](#tutorial) • [How it works](#how-it-works) • [Project structure](#project-structure) • [Data](#data)
 
-# Data
+</div>
 
-Two data sets are available, one about multiple species from [SabDab](https://opig.stats.ox.ac.uk/webapps/sabdab-sabpred/sabdab), the other about COVID [Cov-AbDab] [https://opig.stats.ox.ac.uk/webapps/covabdab/]. 
+---
 
-All data previously mentionned are free to acces. 
+Therapeutic (monoclonal) antibodies are among the most effective treatments available today for chronic inflammatory diseases (Crohn's disease, lupus, multiple sclerosis) and certain cancers, and can be rapidly adapted against fast-mutating pathogens such as SARS-CoV-2. Yet only a few dozen are on the market — antibody design is slow, expensive, and still relies heavily on costly in-vitro screening and binding-energy estimates that are themselves hard to compute.
 
-### SabDab dataset
+**Intelligent Antibodies** explores a faster, in-silico alternative: a **convolutional VAE** learns to generate plausible antibody sequences, and a **Siamese CNN+GRU classifier** predicts whether a generated candidate would actually bind a given antigen — turning candidate discovery into rejection sampling in a learned latent space instead of a physics-based energy calculation.
 
-The data use here are part of SabDab. They relates to _immune complexes_ characterized through X-ray crystallography. 
+## Features
 
-Two files have been collected :
+- 🧪 **Generative pipeline** — a 2-D-latent-space VAE samples candidate antibody sequences; a Siamese classifier scores each one against a target antigen (`intelligent_antibodies/modules/`).
+- 📊 **Interactive dashboard** (Streamlit) — generate candidates, explore the sampled latent space with box/lasso selection, inspect per-candidate stats (hydrophobicity, charge, decode confidence), and view colorized sequences.
+- 🧬 **Real structure prediction** — fold any candidate with [ESMFold](https://esmatlas.com/) (a practical, GPU-cluster-free stand-in for AlphaFold2) rendered as an interactive 3-D structure, colored by per-residue confidence.
+- 🧰 **Runs out of the box** — no trained weights needed to try the dashboard: it detects whether real models exist under `run/models/` and otherwise shows clearly-labeled simulated results.
+- 🗂️ **Full data pipeline** — scripts to fetch, parse, and equilibrate the [SAbDab](https://opig.stats.ox.ac.uk/webapps/sabdab-sabpred/sabdab) antibody-antigen dataset from scratch.
 
-- All_PDB_files.txt : which contains ids for each constitutive proteine-protein structure (Antigen-Antibody). The first four characters of the structure name refer to the [RCSB PDB](https://www.rcsb.org/) database. Second part of the ids concern the chains inside the structures. 
+## Quickstart
 
-- Positive_samples.txt : which contains all the positively interacting proteins from same or different complexes. For instance, ```4gms_J_N_E	2vir_B_A_C``` relates interactions between _4gms_ and _2vir_. No specific order is precised, meaning that first partner can act the antigen or the antibody. This is reciprocal. Indedd as there are complexes, the antigenic chains of _4gms_ can form immune complexes with antibody chains of _2vir_ and antigenic chains of _2vir_ can also form immune complexes with antibody chains of _4gms_. Obviously antigenic and antibody parts chains of a given RCSB ids are forming complexes. 
+Try the dashboard in under a minute — no data download or training required, it runs on simulated results out of the box.
 
-Therefore, two complexes ids that are not matched are not able to form complexes and will act as negative samples. 
+```bash
+git clone https://github.com/sebgra/intelligent_antibodies.git
+cd intelligent_antibodies
 
-All the structures are directly collected from SabDab as fasta files looking as : 
+uv sync                           # installs Python 3.12 + all dependencies
+uv run streamlit run app/main.py  # opens the dashboard in your browser
+```
+
+> Everything here is managed with [uv](https://docs.astral.sh/uv/) — no `uv` yet? `curl -LsSf https://astral.sh/install.sh | sh` (see [the uv docs](https://docs.astral.sh/uv/getting-started/installation/) for other platforms).
+
+Head to the **Generate** tab, check "Use bundled example antigen", and click **Launch generation**. You'll land on the **Results** tab with a full set of candidates, charts, and an interactive latent-space plot — all clearly labeled **simulated**, since no trained model is loaded yet. Follow the [tutorial](#tutorial) below to plug in real data and real trained models.
+
+## Tutorial
+
+A step-by-step walkthrough from "just cloned it" to generating and folding real candidates.
+
+### 1. Explore the dashboard with simulated data
+
+```bash
+uv run streamlit run app/main.py
+```
+
+This is the [Quickstart](#quickstart) above. Worth doing first regardless of whether you plan to train real models — it's the fastest way to see what every tab does:
+
+- **Generate** — pick an antigen (type a sequence, check the example box, or upload a FASTA file), and set the candidate count, interaction-score threshold, and latent-space sampling temperature.
+- **Results → Overview** — KPIs, the score distribution across the sampled pool, and the top candidates.
+- **Results → Latent space** — every sampled point in the VAE's 2-D latent space. **Drag a box or lasso** over a cluster of points to filter the other tabs down to just that selection.
+- **Results → Sequence analysis** — length, hydrophobicity, and charge statistics, plus colorized sequences (by physicochemical residue class).
+- **Results → Candidate explorer** — pick one candidate for a close-up: its colorized sequence, per-residue decode confidence, amino-acid composition, a schematic secondary-structure cartoon, and a button to fold it for real (see [step 5](#5-predict-a-real-structure)).
+- **Dataset & Model** — real statistics computed from the actual SAbDab data and training-curve figures (nothing simulated on this tab).
+
+### 2. Get the real data
+
+Four scripts, run in order from the repo root, turn the raw SAbDab reference files (`data/SAbDab/All_PDB_files.txt`, `positive_samples.txt`, already included) into the tables the models train on. Every script resolves its own paths relative to the repo root, so they work from anywhere.
+
+```bash
+uv run python scripts/download_pdbs.py           # fetch FASTA files from RCSB
+uv run python scripts/get_seq_table.py            # -> data/SAbDab/sequences.csv
+uv run python scripts/get_interaction_table.py    # -> data/SAbDab/data.csv
+uv run python scripts/filter_interaction_table.py # -> data/SAbDab/data_filtered.csv
+```
+
+| Script | What it does |
+|---|---|
+| `download_pdbs.py` | Fetches the FASTA file for every structure referenced in `All_PDB_files.txt` into `data/SAbDab/fasta/all_samples/`. Skips ids it already has (safe to resume); `--limit 20` for a quick smoke test, `--force` to re-fetch everything. |
+| `get_seq_table.py` | Turns the downloaded FASTA files into `sequences.csv`: one row per chain, tagged `\|ab` or `\|ag` by whether its molecule description reads as an antibody chain. |
+| `get_interaction_table.py` | Labels every pair of referenced structures `1` (interacting) or `0`, using `positive_samples.txt`, into `data.csv`. |
+| `filter_interaction_table.py` | Drops pairs whose antibody or antigen side has no known sequence (e.g. a download failed), into `data_filtered.csv` — the file training actually reads. |
+
+<details>
+<summary>What the generated files look like</summary>
+
+`data.csv`:
+
+```
+ab;ag;interaction
+5kel|ab;5kel|ag;1
+5kel|ab;6cwt|ag;0
+...
+```
+
+`sequences.csv`:
+
+```
+seq_id;specie;sequence
+5kel|ag;Zaire ebolavirus (strain Mayinga-76) (128952);IPLGVIHNSTLQVSDVDKLVCRDKLSSTNQLRSVGLNLEGNGVATDVPSATKRWGFRSGVPPKVVNYEAGEWAENCYNLEIKKPDGSECLPAAPDGIRGFPRCRYVHKVSGTGPCAGDFAFHKEGAFFLYDRLASTVIYRGTTFAEGVVAFLILPQAKKDFFSSHPLREPVNATEDPSSGYYSTTIRYQATGFGTNETEYLFEVDNLTYVQLESRFTPQFLLQLNETIYTSGKRSNTTGKLIWKVNPEIDTTIGEWAFWETKKNLTRKIRSEELSFTVVSNGAKNISGQSPARTSSDPGTNTTTEDHKIMASENSSAMVQVHSQGREAAVSHLTTLATISTSPQSLTTKPGPDNSTHNTPVYKLDISEATQVEQHHRRTDNDSTASDTPSATTAAGPPKAENTNTSKSTDFLDPATTTSPQNHSETAGNNNTHHQDTGEESASSGKLGLITNTIAGVAGLITGGRRTRR
+5kel|ag;Zaire ebolavirus (128952);EAIVNAQPKCNPNLHYWTTQDEGAAIGLAWIPYFGPAAEGIYTEGLMHNQDGLICGLRQLANETTQALQLFLRATTELRTFSILNRKAIDFLLQRWGGTCHILGPDCCIEPHDWTKNITDKIDQIIHDFVDKTLPDLEVDDDD
+...
+```
+
+</details>
+
+### 3. Train the models
+
+Two models, trained separately, both reading from the files step 2 produced:
+
+```bash
+uv run python scripts/train_vae.py        # the generator (antibody VAE)
+uv run python scripts/train_siamese.py    # the discriminator (interaction classifier)
+```
+
+Both default to the full dataset and the original hyperparameters (200-epoch VAE, 100-epoch Siamese with early stopping) — slow on CPU. Smoke-test the pipeline first with a tiny slice:
+
+```bash
+uv run python scripts/train_vae.py --epochs 5 --limit 300
+uv run python scripts/train_siamese.py --epochs 3 --limit 2000
+```
+
+A GPU is used automatically if TensorFlow can see one; otherwise it falls back to CPU. Run either script with `--help` for every option (filters, batch size, validation split, early-stopping patience, ...).
+
+Each script saves its weights where the dashboard and `scripts/generate_antibodies.py` expect them, and refreshes the matching plot in `plots/`:
+
+```
+run/models/vae/vae-one-hot-200-encoder.keras
+run/models/vae/vae-one-hot-200-decoder.keras
+run/models/siamese/one-hot-200-model.h5
+```
+
+`run/` is gitignored — these are local artifacts, not something to commit.
+
+### 4. Generate real candidates
+
+Once both models exist, generation switches from simulated to real automatically — no flag to flip:
+
+```bash
+uv run streamlit run app/main.py
+```
+
+The **Generate** tab now shows "✅ Trained models found" and every subsequent run uses them for real; the **Results** banner says explicitly which one (simulated or real) produced what you're looking at.
+
+Prefer the command line? `scripts/generate_antibodies.py` runs the same pipeline and writes a FASTA file of passing candidates:
+
+```bash
+uv run python scripts/generate_antibodies.py --antigen-id 6xe1 \
+    --n-candidates 30 --threshold 0.85 --temperature 1.2
+```
+
+### 5. Predict a real structure
+
+In **Results → Candidate explorer**, every candidate gets an instant schematic cartoon (a simplified secondary-structure heuristic — fast, offline, clearly labeled as illustrative). Click **"🔬 Fold with ESMFold"** underneath it to get a *real* predicted 3-D structure from the free public [ESM Atlas](https://esmatlas.com/) API, rendered interactively and colored by per-residue confidence (pLDDT) using AlphaFold's own color convention. This needs an internet connection and can take up to about a minute, which is why it's on demand rather than automatic — see [How it works](#how-it-works) for why ESMFold rather than AlphaFold2 itself.
+
+## How it works
+
+```mermaid
+flowchart LR
+    AG[Target antigen] --> ENC[One-hot encode]
+    Z["Sample z ~ N(0, T)<br/>(2-D latent space)"] --> VAE[VAE decoder]
+    VAE --> CAND[Candidate antibody sequence]
+    ENC --> SIAM[Siamese CNN + GRU classifier]
+    CAND --> SIAM
+    SIAM -->|score ≥ threshold| RANK[Ranked candidates]
+    RANK --> FOLD["ESMFold / schematic cartoon"]
+```
+
+- **Generator — convolutional VAE** (`modules/models/VAEFull.py`): trained on antibody sequences only (one-hot encoded, Conv2D encoder / Conv2DTranspose decoder), with a 2-D latent space. Sampling `z = temperature × N(0, 1)` and decoding produces a new candidate sequence; `temperature` trades sampling diversity against decode fidelity.
+- **Discriminator — Siamese classifier** (`modules/models/SiameseInteractionClassifier.py`): a shared Conv1D + bidirectional-GRU tower embeds both the candidate antibody and the target antigen; the embeddings are combined and passed through a sigmoid to predict an interaction probability.
+- **Rejection sampling** (`modules/utils/inference.py`): candidates are sampled in batches and kept only if their predicted score clears a threshold — the same loop the dashboard and `scripts/generate_antibodies.py` both drive.
+- **Dataset balancing** (`modules/dataset.py`): real antibody-antigen pairs are overwhelmingly non-interacting, so training downsamples the negative class to match the positive one before fitting the classifier.
+
+## Project structure
+
+```
+intelligent_antibodies/
+├── app/                      Streamlit dashboard (app/main.py) + mock/real generation bridges
+├── intelligent_antibodies/   The installable package: models, data loading, encoding, inference
+│   └── modules/
+│       ├── models/           VAE + Siamese network definitions
+│       ├── layers/           Custom Keras layers (sampling, variational loss)
+│       └── utils/            Encoding schemes, inference loop, shared paths
+├── scripts/                  Data pipeline + training + generation CLIs (see the tutorial above)
+├── data/                     SAbDab / CoV-AbDab reference files and derived tables
+├── notebooks/                Original research notebooks (EDA, encoding experiments, prototyping)
+├── plots/                    Training-curve figures, refreshed by the training scripts
+├── web_interface/            Earlier Flask + Vue.js prototype, superseded by app/ but kept for reference
+└── run/                      Trained weights and generation outputs (gitignored, created locally)
+```
+
+## Data
+
+Two datasets, both free to access:
+
+- **[SAbDab](https://opig.stats.ox.ac.uk/webapps/sabdab-sabpred/sabdab)** — antibody-antigen immune complexes characterized by X-ray crystallography, across many species. This is the dataset the current pipeline trains on.
+- **[CoV-AbDab](https://opig.stats.ox.ac.uk/webapps/covabdab/)** — SARS-CoV antibody/antigen pairs (`data/CoV-AbDab/`). Included for future work; not yet wired into the training scripts above.
+
+### SAbDab
+
+Two reference files drive the data pipeline ([step 2](#2-get-the-real-data) of the tutorial):
+
+- **`All_PDB_files.txt`** — one id per constitutive antigen-antibody structure. The first four characters are the [RCSB PDB](https://www.rcsb.org/) id; the rest identify the chains within that structure.
+- **`positive_samples.txt`** — pairs of structures known to form immune complexes, e.g. `4gms_J_N_E\t2vir_B_A_C`. The relation is **reciprocal and unordered** — either partner can be the antibody or the antigen side, so `filter_interaction_table.py` checks both orderings. Any pair *not* listed here is treated as a negative (non-interacting) sample.
+
+FASTA files are fetched directly from SAbDab/RCSB, e.g.:
 
 ```
 >1A2Y_1|Chain A|IGG1-KAPPA D1.3 FV (LIGHT CHAIN)|Mus musculus (10090)
@@ -36,152 +213,27 @@ QVQLQESGPGLVAPSQSLSITCTVSGFSLTGYGVNWVRQPPGKGLEWLGMIWGDGNTDYNSALKSRLSISKDNSKSQVFL
 KVFGRCELAAAMKRHGLANYRGYSLGNWVCAAKFESNFNTQATNRNTDGSTDYGILQINSRWWCNDGRTPGSRNLCNIPCSALLSSDITASVNCAKKIVSDGNGMNAWVAWRNRCKGTDVQAWIRGCRL
 ```
 
-Sequence informations lines start with _>_ and following line correspond to the constitutive chain of residues (amino-acids). 
+More structures can be pulled from SAbDab's own search tool, e.g. [antibody + protein antigen, with affinity](https://opig.stats.ox.ac.uk/webapps/sabdab-sabpred/sabdab/search/?ABtype=All&method=All&species=All&resolution=&rfactor=&antigen=Protein&ltype=All&constantregion=All&affinity=True&chothiapos=&restype=ALA) or [without](https://opig.stats.ox.ac.uk/webapps/sabdab-sabpred/sabdab/search/?ABtype=All&method=All&species=All&resolution=&rfactor=&antigen=Protein&ltype=All&constantregion=All&affinity=All&chothiapos=&restype=ALA); the [full search page](https://opig.stats.ox.ac.uk/webapps/sabdab-sabpred/sabdab/search/) has more filters. A backup copy of a similar dataset is available at [mit-ll/AlphaSeq_Antibody_Dataset](https://github.com/mit-ll/AlphaSeq_Antibody_Dataset).
 
-### Cov-AbDab
+### CoV-AbDab
 
-The data use here are part of Cov-AbDab. They relates to _immune complexes_.
+Three tab-separated files under `data/CoV-AbDab/`, each row a SARS-CoV identifier plus a pair of sequence columns: `positive dataset.txt` and `negative dataset.txt` (interacting / non-interacting), and `independent test.txt` as a held-out set.
 
-Three files are available : 
+## Resources & references
 
-- positive dataset.txt : a three column file metionning the Sars-cov identifier, the antibody sequence and the antigen sequence. Such chains can form immune complexes.
+- [Deep learning benchmark for antibody-antigen binding](https://www.sciencedirect.com/science/article/pii/S1093326322002431) — motivating article.
+- [piercelab/antibody_benchmark](https://github.com/piercelab/antibody_benchmark) — a standard antibody-antigen docking benchmark.
+- [emersON106/AbAgIntPre](https://github.com/emersON106/AbAgIntPre) ([paper](https://www.frontiersin.org/journals/immunology/articles/10.3389/fimmu.2022.1053617/full)) — a closely related Siamese-network approach to antibody-antigen interaction prediction, including its own curated SAbDab subset.
+- Sequence encodings explored during prototyping: one-hot, [k-mer / Prot-Vec style encoders](https://github.com/anazhmetdin/protEncoder), and [Chaos Game Representation](https://dmnfarrell.github.io/bioinformatics/mhclearning).
+- [ESM Atlas](https://esmatlas.com/) — the public ESMFold API this project's structure-prediction feature calls.
 
-- negative dataset.txt : a three column file metionning the Sars-cov identifier, the antibody sequence and the antigen sequence. Such chains do not  form immune complexes.
+## Project status
 
-- Independant test.txt  : 
+This is an active research / learning project, not a production tool:
 
+- No pretrained weights are shipped — train your own (see the [tutorial](#tutorial)) or use the dashboard's simulated mode to explore the interface first.
+- The Siamese classifier's custom metrics (`accuracy`/`f1`/`mcc`) are simple, approximate formulas kept for continuity with earlier experiments, not calibrated, production-grade metrics.
+- CoV-AbDab is included but not yet wired into training.
+- No license has been chosen yet — please open an issue if you'd like to use this project and licensing matters to you.
 
-## Get the data
-
-For convenience, some scripts have been written to parse SAbDab database to collect all the fasta files of complexes and to structures sequences table. 
-
-To get all the sequences please use _./scripts/download_pdb.py_ through : 
-
-```
-python download_pdb.py
-```
-
-All fasta files will be saved in _./data/SabDab/fasta_ folder.
-
-To get the interaction table use : 
-
-```
-python get_interaction_table.py
-```
-
-This will create _data.csv_ a three column tabular file containing antibody identifier, antigen identifier and 0/1 depending on the ability to form immune complexes. Identifiers are supplemented wit _|ag_ or _|ab_ to refer to the antigenic or antiboy part of the complex.
-
-The data look like : 
-
-```
-ab;ag;interaction
-5kel|ab;5kel|ag;1
-5kel|ab;6cwt|ag;0
-...
-```
-
-To have the sequences table use :
-
-```
-python get_seq_table.py
-```
-
-This will create _sequences_.csv_ a three column tabular file containing extended identifier such as _abcd|ag_ or _abcd|ab_, the species from where it comes and the chain of residues.
-
-```
-seq_id;specie;sequence
-5kel|ag;Zaire ebolavirus (strain Mayinga-76) (128952);IPLGVIHNSTLQVSDVDKLVCRDKLSSTNQLRSVGLNLEGNGVATDVPSATKRWGFRSGVPPKVVNYEAGEWAENCYNLEIKKPDGSECLPAAPDGIRGFPRCRYVHKVSGTGPCAGDFAFHKEGAFFLYDRLASTVIYRGTTFAEGVVAFLILPQAKKDFFSSHPLREPVNATEDPSSGYYSTTIRYQATGFGTNETEYLFEVDNLTYVQLESRFTPQFLLQLNETIYTSGKRSNTTGKLIWKVNPEIDTTIGEWAFWETKKNLTRKIRSEELSFTVVSNGAKNISGQSPARTSSDPGTNTTTEDHKIMASENSSAMVQVHSQGREAAVSHLTTLATISTSPQSLTTKPGPDNSTHNTPVYKLDISEATQVEQHHRRTDNDSTASDTPSATTAAGPPKAENTNTSKSTDFLDPATTTSPQNHSETAGNNNTHHQDTGEESASSGKLGLITNTIAGVAGLITGGRRTRR
-5kel|ag;Zaire ebolavirus (128952);EAIVNAQPKCNPNLHYWTTQDEGAAIGLAWIPYFGPAAEGIYTEGLMHNQDGLICGLRQLANETTQALQLFLRATTELRTFSILNRKAIDFLLQRWGGTCHILGPDCCIEPHDWTKNITDKIDQIIHDFVDKTLPDLEVDDDD
-...
-```
-
-# Strategy
-
-## Data encoding
-
-- Choas Game Representation
-
-    https://dmnfarrell.github.io/bioinformatics/mhclearning
-
-    https://computational-discovery-on-jupyter.github.io/Computational-Discovery-on-Jupyter/Contents/chaos-game-representation.html - CGR
-
-- One Hot
-
-    https://github.com/anazhmetdin/protEncoder/tree/main/protencoder
-
-- k-mers
-
-    https://github.com/anazhmetdin/protEncoder/tree/main/protencoder
-
-- Prot-vec
-
-    https://github.com/anazhmetdin/protEncoder/tree/main/protencoder
-
-- Prot encoder
-
-    https://github.com/anazhmetdin/protEncoder/tree/main/protencoder
-
-## Neural networks
-
-    https://github.com/sebgra/Tensorflow_Advanced_Specialization/blob/main/C1/week_1/C1_W1_Lab_3_siamese-network.ipynb
-
-- Siamese Network
-
-    https://github.com/sebgra/AI4_Biologist/blob/main/iBio-Summer-School-main/Summer_school_PPI_solved.ipynb
-
-- Double Channel Siamese Network 
-
-    https://bmcgenomics.biomedcentral.com/articles/10.1186/s12864-022-08772-6
-
-## Draft
-
-All the data that can be used fir the challenge can be found on [SabDab](https://opig.stats.ox.ac.uk/webapps/sabdab-sabpred/sabdab)
-
-To get access to all the data the [search module]() is used. 
-
-To get data containing both antibody and proteic antigene sequences with affinity use [this](https://opig.stats.ox.ac.uk/webapps/sabdab-sabpred/sabdab/search/?ABtype=All&method=All&species=All&resolution=&rfactor=&antigen=Protein&ltype=All&constantregion=All&affinity=True&chothiapos=&restype=ALA) - 468 entries
-To get data containing both antibody and proteic antigene sequences without affinity use [this](https://opig.stats.ox.ac.uk/webapps/sabdab-sabpred/sabdab/search/?ABtype=All&method=All&species=All&resolution=&rfactor=&antigen=Protein&ltype=All&constantregion=All&affinity=All&chothiapos=&restype=ALA) - 5092 entries.
-
-To get data containing both antibody and non necessary proteic antigene sequences with affinity use [this](https://opig.stats.ox.ac.uk/webapps/sabdab-sabpred/sabdab/search/?ABtype=All&method=All&species=All&resolution=&rfactor=&antigen=All&ltype=All&constantregion=All&affinity=True&chothiapos=&restype=ALA) - 737 entries
-
-To get data containing both antibody and non necessary proteic antigene sequences without affinity use [this](https://opig.stats.ox.ac.uk/webapps/sabdab-sabpred/sabdab/search/?ABtype=All&method=All&species=All&resolution=&rfactor=&antigen=All&ltype=All&constantregion=All&affinity=All&chothiapos=&restype=ALA) - 7825 entries.
-
-More criteria can be applied to select data from [here](https://opig.stats.ox.ac.uk/webapps/sabdab-sabpred/sabdab/search/)
-
-
-
-
-Backup data can be found [here](https://github.com/mit-ll/AlphaSeq_Antibody_Dataset)
-
-## Covid data
-
-[Here](https://opig.stats.ox.ac.uk/webapps/covabdab/)
-
-# Resources
-
-[Article](https://www.sciencedirect.com/science/article/pii/S1093326322002431)
-
-
-[Benchmark](https://github.com/piercelab/antibody_benchmark)
-
-
-[Siamese Network](https://github.com/emersON106/AbAgIntPre)
-https://www.frontiersin.org/journals/immunology/articles/10.3389/fimmu.2022.1053617/full#h6x
-
-# Data
-https://github.com/emersON106/AbAgIntPre/tree/main
-
- - Get this [data](https://github.com/emersON106/AbAgIntPre/tree/main/SAbDab) to have all the usefull PDBs, then collect all the corresponding fasta files.
- - Parse all the Fasta grepping "heavy chain", "light chain", "antibody", "antigene" to create dataset of sequences for both Ag and Ab.
-
-
-# Installation steps
-
-```bash
-mamba create -n test python==3.9
-mamba activate test
-mamba install numpy pandas keras matplotlib anaconda::scikit-learn -y
-mamba install tensorflow -y
-pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu
-
-```
+Issues and pull requests are welcome.
