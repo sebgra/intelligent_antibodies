@@ -21,9 +21,7 @@ import pandas as pd
 import tensorflow as tf
 from keras import layers
 
-from intelligent_antibodies.modules.models.SiameseInteractionClassifier import (
-    accuracy, binary_crossentropy, f1, mcc,
-)
+from intelligent_antibodies.modules.models.SiameseInteractionClassifier import f1, mcc
 from intelligent_antibodies.modules.models.VAEFull import VAEFull
 from intelligent_antibodies.modules.utils.encoding import ProteinOneHotEncoder
 from intelligent_antibodies.modules.utils.inference import get_unique_interacting_antibodies
@@ -55,7 +53,14 @@ def load_models(vector_size: int = 200) -> Dict:
     siamese_path = siamese_weights_path(vector_size)
     siamese = keras.models.load_model(
         str(siamese_path),
-        custom_objects=dict(f1=f1, mcc=mcc, binary_crossentropy=binary_crossentropy, accuracy=accuracy),
+        # `binary_crossentropy`/`accuracy` are aliased to the Keras built-ins that
+        # replaced the broken hand-rolled pair, so checkpoints saved by the old
+        # compile() still deserialize instead of raising on an unknown object.
+        custom_objects=dict(
+            f1=f1, mcc=mcc,
+            binary_crossentropy=keras.losses.binary_crossentropy,
+            accuracy=keras.metrics.binary_accuracy,
+        ),
     )
     return {"vae_full": vae_full, "siamese": siamese}
 

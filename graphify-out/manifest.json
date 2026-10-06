@@ -1,0 +1,590 @@
+{
+  ".claude/.headroom_wrap_marker.json": {
+    "mtime": 1791271699.8039284,
+    "seen": 1791272255.4806614,
+    "ast_hash": "5075e9be297f552ac1b0cdc75c701f1c",
+    "semantic_hash": "5075e9be297f552ac1b0cdc75c701f1c"
+  },
+  ".claude/.headroom_wrap_owners.json": {
+    "mtime": 1791271699.8079283,
+    "seen": 1791272255.4806662,
+    "ast_hash": "2110a03a854d0828ca4aba098c4bc0fe",
+    "semantic_hash": "2110a03a854d0828ca4aba098c4bc0fe"
+  },
+  ".claude/settings.local.json": {
+    "mtime": 1791271699.8119285,
+    "seen": 1791272255.4806678,
+    "ast_hash": "38d6bc8cd57c5fd641a255732d64dafa",
+    "semantic_hash": "38d6bc8cd57c5fd641a255732d64dafa"
+  },
+  "app/main.py": {
+    "mtime": 1791208439.7024949,
+    "seen": 1791272255.480669,
+    "ast_hash": "5f9d6319b843943b40379ee741a6cbf6",
+    "semantic_hash": "5f9d6319b843943b40379ee741a6cbf6"
+  },
+  "app/mock_results.py": {
+    "mtime": 1791208453.422495,
+    "seen": 1791272255.4806697,
+    "ast_hash": "18beafa787d39ec4987b2ffbb2136c5f",
+    "semantic_hash": "18beafa787d39ec4987b2ffbb2136c5f"
+  },
+  "app/real_pipeline.py": {
+    "mtime": 1791208439.698495,
+    "seen": 1791272255.4806705,
+    "ast_hash": "4078a4431acf209ec8cc5ffe624d4c61",
+    "semantic_hash": "4078a4431acf209ec8cc5ffe624d4c61"
+  },
+  "app/structure_prediction.py": {
+    "mtime": 1791205982.7424934,
+    "seen": 1791272255.4806714,
+    "ast_hash": "1a226455d82e50cb6b8a22b13de1a3d0",
+    "semantic_hash": "1a226455d82e50cb6b8a22b13de1a3d0"
+  },
+  "hello.py": {
+    "mtime": 1791196957.9104626,
+    "seen": 1791272255.4806724,
+    "ast_hash": "2121a2bab469ff3712ab7b362a12a2c8",
+    "semantic_hash": "2121a2bab469ff3712ab7b362a12a2c8"
+  },
+  "intelligent_antibodies/__init__.py": {
+    "mtime": 1791203641.7304971,
+    "seen": 1791272255.4806728,
+    "ast_hash": "2b148d8b59bfa7a7a6b79b774035ed59",
+    "semantic_hash": "2b148d8b59bfa7a7a6b79b774035ed59"
+  },
+  "intelligent_antibodies/modules/__init__.py": {
+    "mtime": 1791196957.9104626,
+    "seen": 1791272255.4806736,
+    "ast_hash": "d41d8cd98f00b204e9800998ecf8427e",
+    "semantic_hash": "d41d8cd98f00b204e9800998ecf8427e"
+  },
+  "intelligent_antibodies/modules/data/loader.py": {
+    "mtime": 1791196957.9144628,
+    "seen": 1791272255.4806743,
+    "ast_hash": "9667976d017cd1662b638933f8ac0aca",
+    "semantic_hash": "9667976d017cd1662b638933f8ac0aca"
+  },
+  "intelligent_antibodies/modules/dataset.py": {
+    "mtime": 1791203708.0504954,
+    "seen": 1791272255.480675,
+    "ast_hash": "d8ce3e545098467aa9336f9dddf4b15b",
+    "semantic_hash": "d8ce3e545098467aa9336f9dddf4b15b"
+  },
+  "intelligent_antibodies/modules/layers/SamplingLayer.py": {
+    "mtime": 1791196957.9144628,
+    "seen": 1791272255.480676,
+    "ast_hash": "146a65ae87c9a20235f1c370fa59e01a",
+    "semantic_hash": "146a65ae87c9a20235f1c370fa59e01a"
+  },
+  "intelligent_antibodies/modules/layers/VariationalLossLayer.py": {
+    "mtime": 1791196957.9144628,
+    "seen": 1791272255.4806767,
+    "ast_hash": "fe5ea0868261bd961ba0b53ab61d98fa",
+    "semantic_hash": "fe5ea0868261bd961ba0b53ab61d98fa"
+  },
+  "intelligent_antibodies/modules/layers/__init__.py": {
+    "mtime": 1791203659.1104977,
+    "seen": 1791272255.4806774,
+    "ast_hash": "a71ca26b01d9d13301cdb16cd4acc4e1",
+    "semantic_hash": "a71ca26b01d9d13301cdb16cd4acc4e1"
+  },
+  "intelligent_antibodies/modules/main_pipeline.py": {
+    "mtime": 1791204907.21449,
+    "seen": 1791272255.4806778,
+    "ast_hash": "f3350685d588d7876333715a4d15bb0b",
+    "semantic_hash": "f3350685d588d7876333715a4d15bb0b"
+  },
+  "intelligent_antibodies/modules/models/SiameseInteractionClassifier.py": {
+    "mtime": 1791204131.1104975,
+    "seen": 1791272255.4806786,
+    "ast_hash": "71ee226de1b0360291d50c21f047f9bd",
+    "semantic_hash": "71ee226de1b0360291d50c21f047f9bd"
+  },
+  "intelligent_antibodies/modules/models/VAE.py": {
+    "mtime": 1791203663.4744976,
+    "seen": 1791272255.4806795,
+    "ast_hash": "4a94b1b29a4422657e2908fe4b59fb30",
+    "semantic_hash": "4a94b1b29a4422657e2908fe4b59fb30"
+  },
+  "intelligent_antibodies/modules/models/VAEFull.py": {
+    "mtime": 1791203667.2064977,
+    "seen": 1791272255.4806802,
+    "ast_hash": "72c140dde5c6027c72133b08b2c5bd89",
+    "semantic_hash": "72c140dde5c6027c72133b08b2c5bd89"
+  },
+  "intelligent_antibodies/modules/models/VAEProtein.py": {
+    "mtime": 1791196957.9184628,
+    "seen": 1791272255.480681,
+    "ast_hash": "766511eca1c066af6e12742003bd831e",
+    "semantic_hash": "766511eca1c066af6e12742003bd831e"
+  },
+  "intelligent_antibodies/modules/models/__init__.py": {
+    "mtime": 1791196957.9184628,
+    "seen": 1791272255.4806814,
+    "ast_hash": "d41d8cd98f00b204e9800998ecf8427e",
+    "semantic_hash": "d41d8cd98f00b204e9800998ecf8427e"
+  },
+  "intelligent_antibodies/modules/utils/__init__.py": {
+    "mtime": 1791196957.9184628,
+    "seen": 1791272255.4806821,
+    "ast_hash": "d41d8cd98f00b204e9800998ecf8427e",
+    "semantic_hash": "d41d8cd98f00b204e9800998ecf8427e"
+  },
+  "intelligent_antibodies/modules/utils/encoding.py": {
+    "mtime": 1791203725.8624954,
+    "seen": 1791272255.4806833,
+    "ast_hash": "12804430a3be80169ac8907d7c7c62ca",
+    "semantic_hash": "12804430a3be80169ac8907d7c7c62ca"
+  },
+  "intelligent_antibodies/modules/utils/inference.py": {
+    "mtime": 1791208417.8784945,
+    "seen": 1791272255.480684,
+    "ast_hash": "ff41f469aaf6cd74c795282da55328e2",
+    "semantic_hash": "ff41f469aaf6cd74c795282da55328e2"
+  },
+  "intelligent_antibodies/modules/utils/kmer-encoding.py": {
+    "mtime": 1791196957.9184628,
+    "seen": 1791272255.4806848,
+    "ast_hash": "773188b855b87bb9f919c7bf14b4e04f",
+    "semantic_hash": "773188b855b87bb9f919c7bf14b4e04f"
+  },
+  "intelligent_antibodies/modules/utils/paths.py": {
+    "mtime": 1791208337.6584942,
+    "seen": 1791272255.4806855,
+    "ast_hash": "840c6de1de0434cd95d2a17e9b502fcb",
+    "semantic_hash": "840c6de1de0434cd95d2a17e9b502fcb"
+  },
+  "intelligent_antibodies/modules/utils/sabdab.py": {
+    "mtime": 1791204281.8104851,
+    "seen": 1791272255.4806862,
+    "ast_hash": "cfa841bd2923a5d0977ee4dad6f99a7d",
+    "semantic_hash": "cfa841bd2923a5d0977ee4dad6f99a7d"
+  },
+  "notebooks/modules/__init__.py": {
+    "mtime": 1791196958.2184627,
+    "seen": 1791272255.480687,
+    "ast_hash": "d41d8cd98f00b204e9800998ecf8427e",
+    "semantic_hash": "d41d8cd98f00b204e9800998ecf8427e"
+  },
+  "notebooks/modules/data/loader.py": {
+    "mtime": 1791196958.2184627,
+    "seen": 1791272255.4806874,
+    "ast_hash": "9667976d017cd1662b638933f8ac0aca",
+    "semantic_hash": "9667976d017cd1662b638933f8ac0aca"
+  },
+  "notebooks/modules/dataset.py": {
+    "mtime": 1791196958.2184627,
+    "seen": 1791272255.480688,
+    "ast_hash": "49e2cf612cafbb8ed418bce47e928854",
+    "semantic_hash": "49e2cf612cafbb8ed418bce47e928854"
+  },
+  "notebooks/modules/encoding.py": {
+    "mtime": 1791196958.2184627,
+    "seen": 1791272255.4806888,
+    "ast_hash": "014466075be1c425a92b588473e214a7",
+    "semantic_hash": "014466075be1c425a92b588473e214a7"
+  },
+  "notebooks/modules/kmer-encoding.py": {
+    "mtime": 1791196958.2184627,
+    "seen": 1791272255.4806898,
+    "ast_hash": "773188b855b87bb9f919c7bf14b4e04f",
+    "semantic_hash": "773188b855b87bb9f919c7bf14b4e04f"
+  },
+  "notebooks/modules/layers/SamplingLayer.py": {
+    "mtime": 1791196958.2184627,
+    "seen": 1791272255.4806902,
+    "ast_hash": "146a65ae87c9a20235f1c370fa59e01a",
+    "semantic_hash": "146a65ae87c9a20235f1c370fa59e01a"
+  },
+  "notebooks/modules/layers/VariationalLossLayer.py": {
+    "mtime": 1791196958.2184627,
+    "seen": 1791272255.480691,
+    "ast_hash": "fe5ea0868261bd961ba0b53ab61d98fa",
+    "semantic_hash": "fe5ea0868261bd961ba0b53ab61d98fa"
+  },
+  "notebooks/modules/layers/__init__.py": {
+    "mtime": 1791196958.2184627,
+    "seen": 1791272255.4806914,
+    "ast_hash": "6ad08cc0f9ff1bab48f7bfef84ca227c",
+    "semantic_hash": "6ad08cc0f9ff1bab48f7bfef84ca227c"
+  },
+  "notebooks/modules/models/SiameseInteractionClassifier.py": {
+    "mtime": 1791196958.2184627,
+    "seen": 1791272255.4806921,
+    "ast_hash": "0549e7403481580fc87f1629d177838e",
+    "semantic_hash": "0549e7403481580fc87f1629d177838e"
+  },
+  "notebooks/modules/models/VAE.py": {
+    "mtime": 1791196958.2184627,
+    "seen": 1791272255.480693,
+    "ast_hash": "83442c1c2d6b89afbe507728274e4b27",
+    "semantic_hash": "83442c1c2d6b89afbe507728274e4b27"
+  },
+  "notebooks/modules/models/VAEFull.py": {
+    "mtime": 1791196958.2184627,
+    "seen": 1791272255.4806938,
+    "ast_hash": "fd4e9362c91fcb98b200b3077e83eb9f",
+    "semantic_hash": "fd4e9362c91fcb98b200b3077e83eb9f"
+  },
+  "notebooks/modules/models/VAEProtein.py": {
+    "mtime": 1791196958.2184627,
+    "seen": 1791272255.4806943,
+    "ast_hash": "766511eca1c066af6e12742003bd831e",
+    "semantic_hash": "766511eca1c066af6e12742003bd831e"
+  },
+  "notebooks/modules/models/__init__.py": {
+    "mtime": 1791196958.2184627,
+    "seen": 1791272255.480695,
+    "ast_hash": "d41d8cd98f00b204e9800998ecf8427e",
+    "semantic_hash": "d41d8cd98f00b204e9800998ecf8427e"
+  },
+  "package.json": {
+    "mtime": 1791196958.2224627,
+    "seen": 1791272255.4806957,
+    "ast_hash": "6df9bde13ff3cf144fe49f5b45d526ee",
+    "semantic_hash": "6df9bde13ff3cf144fe49f5b45d526ee"
+  },
+  "pyproject.toml": {
+    "mtime": 1791203636.894497,
+    "seen": 1791272255.4806967,
+    "ast_hash": "2eead4ae624256b695df7c5395b21c8e",
+    "semantic_hash": "2eead4ae624256b695df7c5395b21c8e"
+  },
+  "scripts/download_pdbs.py": {
+    "mtime": 1791204295.0824878,
+    "seen": 1791272255.4806974,
+    "ast_hash": "8a9f59ea5a8de2bc627f9091b71bfcc3",
+    "semantic_hash": "8a9f59ea5a8de2bc627f9091b71bfcc3"
+  },
+  "scripts/filter_interaction_table.py": {
+    "mtime": 1791204324.518487,
+    "seen": 1791272255.4806986,
+    "ast_hash": "02d5af95bda7c3bd19d68d631bfa70a2",
+    "semantic_hash": "02d5af95bda7c3bd19d68d631bfa70a2"
+  },
+  "scripts/generate_antibodies.py": {
+    "mtime": 1791204732.6264954,
+    "seen": 1791272255.480699,
+    "ast_hash": "e0a8de8cac3d7ede6b9b9be30148d2dd",
+    "semantic_hash": "e0a8de8cac3d7ede6b9b9be30148d2dd"
+  },
+  "scripts/get_interaction_table.py": {
+    "mtime": 1791204305.170487,
+    "seen": 1791272255.4807003,
+    "ast_hash": "91403cc7c55fda80d87a3a287adfafbd",
+    "semantic_hash": "91403cc7c55fda80d87a3a287adfafbd"
+  },
+  "scripts/get_seq_table.py": {
+    "mtime": 1791204316.3384867,
+    "seen": 1791272255.4807007,
+    "ast_hash": "c2cd7299f3cb7091149d318f7e5368f3",
+    "semantic_hash": "c2cd7299f3cb7091149d318f7e5368f3"
+  },
+  "scripts/sandbox.py": {
+    "mtime": 1791196958.2224627,
+    "seen": 1791272255.4807014,
+    "ast_hash": "f09914a71f92646b44474fa82e882d27",
+    "semantic_hash": "f09914a71f92646b44474fa82e882d27"
+  },
+  "scripts/train_siamese.py": {
+    "mtime": 1791204490.6544924,
+    "seen": 1791272255.480702,
+    "ast_hash": "9a081762835384654348f231dc876065",
+    "semantic_hash": "9a081762835384654348f231dc876065"
+  },
+  "scripts/train_vae.py": {
+    "mtime": 1791204470.5104907,
+    "seen": 1791272255.4807026,
+    "ast_hash": "c2f0818cbe19d41680cd96e2648fb4e5",
+    "semantic_hash": "c2f0818cbe19d41680cd96e2648fb4e5"
+  },
+  "web_interface/app.py": {
+    "mtime": 1791196958.2544627,
+    "seen": 1791272255.4807036,
+    "ast_hash": "6eb8563cc58e5b9a0a16bf61b6cdd232",
+    "semantic_hash": "6eb8563cc58e5b9a0a16bf61b6cdd232"
+  },
+  "web_interface/intelligent-antibodies-view/.vscode/extensions.json": {
+    "mtime": 1791196958.2664628,
+    "seen": 1791272255.4807043,
+    "ast_hash": "886c161c2f2d9388473a64033e7d1931",
+    "semantic_hash": "886c161c2f2d9388473a64033e7d1931"
+  },
+  "web_interface/intelligent-antibodies-view/jsconfig.json": {
+    "mtime": 1791196958.2664628,
+    "seen": 1791272255.4807048,
+    "ast_hash": "7e6d8df69731a24bb613611c46ff4669",
+    "semantic_hash": "7e6d8df69731a24bb613611c46ff4669"
+  },
+  "web_interface/intelligent-antibodies-view/package.json": {
+    "mtime": 1791196958.2704628,
+    "seen": 1791272255.4807055,
+    "ast_hash": "2385a89ac7b193ad6c5760118a103159",
+    "semantic_hash": "2385a89ac7b193ad6c5760118a103159"
+  },
+  "web_interface/intelligent-antibodies-view/src/App.vue": {
+    "mtime": 1791196958.2704628,
+    "seen": 1791272255.4807062,
+    "ast_hash": "92ea11ce850848e9d79be6a5ebe3e66a",
+    "semantic_hash": "92ea11ce850848e9d79be6a5ebe3e66a"
+  },
+  "web_interface/intelligent-antibodies-view/src/api/api.js": {
+    "mtime": 1791196958.2704628,
+    "seen": 1791272255.4807072,
+    "ast_hash": "985c04fad9a679629a45b63e594bb408",
+    "semantic_hash": "985c04fad9a679629a45b63e594bb408"
+  },
+  "web_interface/intelligent-antibodies-view/src/api/generate.js": {
+    "mtime": 1791196958.2704628,
+    "seen": 1791272255.480708,
+    "ast_hash": "70e447eea8ebc606ae70debf07cdf832",
+    "semantic_hash": "70e447eea8ebc606ae70debf07cdf832"
+  },
+  "web_interface/intelligent-antibodies-view/src/api/structure.js": {
+    "mtime": 1791196958.2704628,
+    "seen": 1791272255.4807084,
+    "ast_hash": "3a91c2ec4abf46d88cbe77a8e39bec65",
+    "semantic_hash": "3a91c2ec4abf46d88cbe77a8e39bec65"
+  },
+  "web_interface/intelligent-antibodies-view/src/components/Action.vue": {
+    "mtime": 1791196958.2704628,
+    "seen": 1791272255.480709,
+    "ast_hash": "80ef47044e8ac8b1fd990d1a2d2475f6",
+    "semantic_hash": "80ef47044e8ac8b1fd990d1a2d2475f6"
+  },
+  "web_interface/intelligent-antibodies-view/src/components/Input.vue": {
+    "mtime": 1791196958.2704628,
+    "seen": 1791272255.4807098,
+    "ast_hash": "7ecaf358fd12a97d0aa72d1f251d55de",
+    "semantic_hash": "7ecaf358fd12a97d0aa72d1f251d55de"
+  },
+  "web_interface/intelligent-antibodies-view/src/components/Protein.vue": {
+    "mtime": 1791196958.2704628,
+    "seen": 1791272255.4807107,
+    "ast_hash": "38f2c90563b8f19295ad5888d47a62bd",
+    "semantic_hash": "38f2c90563b8f19295ad5888d47a62bd"
+  },
+  "web_interface/intelligent-antibodies-view/src/components/Table.vue": {
+    "mtime": 1791196958.2704628,
+    "seen": 1791272255.4807112,
+    "ast_hash": "83dcb52a936afd26b870ddb1dce99ef4",
+    "semantic_hash": "83dcb52a936afd26b870ddb1dce99ef4"
+  },
+  "web_interface/intelligent-antibodies-view/src/components/Title.vue": {
+    "mtime": 1791196958.2704628,
+    "seen": 1791272255.480712,
+    "ast_hash": "e4b8cf8834beeecd99b5664b7b5caa54",
+    "semantic_hash": "e4b8cf8834beeecd99b5664b7b5caa54"
+  },
+  "web_interface/intelligent-antibodies-view/src/components/icons/IconCommunity.vue": {
+    "mtime": 1791196958.2824628,
+    "seen": 1791272255.480713,
+    "ast_hash": "32cf4fb777d971aca8014735d9453823",
+    "semantic_hash": "32cf4fb777d971aca8014735d9453823"
+  },
+  "web_interface/intelligent-antibodies-view/src/components/icons/IconDocumentation.vue": {
+    "mtime": 1791196958.2824628,
+    "seen": 1791272255.4807134,
+    "ast_hash": "68d68fd207b35e046e193dd2fe93f1ab",
+    "semantic_hash": "68d68fd207b35e046e193dd2fe93f1ab"
+  },
+  "web_interface/intelligent-antibodies-view/src/components/icons/IconEcosystem.vue": {
+    "mtime": 1791196958.2824628,
+    "seen": 1791272255.4807143,
+    "ast_hash": "9f9e035ec68b9b11ac2989ac5151221a",
+    "semantic_hash": "9f9e035ec68b9b11ac2989ac5151221a"
+  },
+  "web_interface/intelligent-antibodies-view/src/components/icons/IconSupport.vue": {
+    "mtime": 1791196958.2824628,
+    "seen": 1791272255.480715,
+    "ast_hash": "8854c68d3082b218d245f1ea730d69ba",
+    "semantic_hash": "8854c68d3082b218d245f1ea730d69ba"
+  },
+  "web_interface/intelligent-antibodies-view/src/components/icons/IconTooling.vue": {
+    "mtime": 1791196958.2824628,
+    "seen": 1791272255.4807158,
+    "ast_hash": "566807b38eb19307ed3410f2fbbb6357",
+    "semantic_hash": "566807b38eb19307ed3410f2fbbb6357"
+  },
+  "web_interface/intelligent-antibodies-view/src/main.js": {
+    "mtime": 1791196958.2824628,
+    "seen": 1791272255.4807162,
+    "ast_hash": "050a84cbe6b6eefdf9a81f382457f036",
+    "semantic_hash": "050a84cbe6b6eefdf9a81f382457f036"
+  },
+  "web_interface/intelligent-antibodies-view/src/router/index.js": {
+    "mtime": 1791196958.2824628,
+    "seen": 1791272255.480717,
+    "ast_hash": "9c714eb8e75ed7c45e91cd7624dce33a",
+    "semantic_hash": "9c714eb8e75ed7c45e91cd7624dce33a"
+  },
+  "web_interface/intelligent-antibodies-view/src/store/index.js": {
+    "mtime": 1791196958.2824628,
+    "seen": 1791272255.480718,
+    "ast_hash": "b14d5def58ceb2ebdb4949bcff761b27",
+    "semantic_hash": "b14d5def58ceb2ebdb4949bcff761b27"
+  },
+  "web_interface/intelligent-antibodies-view/src/views/AboutView.vue": {
+    "mtime": 1791196958.2824628,
+    "seen": 1791272255.4807184,
+    "ast_hash": "b3577a4b81d5620807050d8a50864b54",
+    "semantic_hash": "b3577a4b81d5620807050d8a50864b54"
+  },
+  "web_interface/intelligent-antibodies-view/src/views/DisplayView.vue": {
+    "mtime": 1791196958.2824628,
+    "seen": 1791272255.480719,
+    "ast_hash": "6be03f5a095a6d735d4e32345f22ef4d",
+    "semantic_hash": "6be03f5a095a6d735d4e32345f22ef4d"
+  },
+  "web_interface/intelligent-antibodies-view/src/views/GenerateView.vue": {
+    "mtime": 1791196958.2824628,
+    "seen": 1791272255.4807198,
+    "ast_hash": "b3db5032537ba4f150dcecda3e17e666",
+    "semantic_hash": "b3db5032537ba4f150dcecda3e17e666"
+  },
+  "web_interface/intelligent-antibodies-view/vite.config.js": {
+    "mtime": 1791196958.2824628,
+    "seen": 1791272255.4807208,
+    "ast_hash": "b467661ac89634c17866a44872fa89c4",
+    "semantic_hash": "b467661ac89634c17866a44872fa89c4"
+  },
+  "web_interface/main.py": {
+    "mtime": 1791196958.2824628,
+    "seen": 1791272255.4807212,
+    "ast_hash": "e51cdc8fdb0c842f258084c06c00370d",
+    "semantic_hash": "e51cdc8fdb0c842f258084c06c00370d"
+  },
+  ".serena/project.yml": {
+    "mtime": 1791271520.5759397,
+    "seen": 1791272255.4807222,
+    "ast_hash": "a290391f7b2fea08a7b1d68219af6ebb",
+    "semantic_hash": "a290391f7b2fea08a7b1d68219af6ebb"
+  },
+  "README.md": {
+    "mtime": 1791208548.242489,
+    "seen": 1791272255.4807227,
+    "ast_hash": "a46b3d6673bbb31335e2f81315fc9ec7",
+    "semantic_hash": "a46b3d6673bbb31335e2f81315fc9ec7"
+  },
+  "data/CoV-AbDab/independent test.txt": {
+    "mtime": 1791196957.7504628,
+    "seen": 1791272255.4807234,
+    "ast_hash": "df3fb34d460aa72563a539e852812409",
+    "semantic_hash": "df3fb34d460aa72563a539e852812409"
+  },
+  "data/CoV-AbDab/negative dataset.txt": {
+    "mtime": 1791196957.7544627,
+    "seen": 1791272255.4807243,
+    "ast_hash": "ebc5d37f9b56d8b9282230da44aa8b89",
+    "semantic_hash": "ebc5d37f9b56d8b9282230da44aa8b89"
+  },
+  "data/CoV-AbDab/positive dataset.txt": {
+    "mtime": 1791196957.7584627,
+    "seen": 1791272255.480725,
+    "ast_hash": "490b9ccbc53e77ff5d60e1d3fa94f7a5",
+    "semantic_hash": "490b9ccbc53e77ff5d60e1d3fa94f7a5"
+  },
+  "data/SAbDab/All_PDB_files.txt": {
+    "mtime": 1791196957.7584627,
+    "seen": 1791272255.4807258,
+    "ast_hash": "bb814ec2596665d14be0f944cb6b63d3",
+    "semantic_hash": "bb814ec2596665d14be0f944cb6b63d3"
+  },
+  "data/SAbDab/positive_samples.txt": {
+    "mtime": 1791196957.9064627,
+    "seen": 1791272255.4807262,
+    "ast_hash": "fdf4238a2256a1b89d43fe4e3fc755f0",
+    "semantic_hash": "fdf4238a2256a1b89d43fe4e3fc755f0"
+  },
+  "data/SAbDab/unfetched.txt": {
+    "mtime": 1791196957.9104626,
+    "seen": 1791272255.480727,
+    "ast_hash": "b0587882fddcbf63d2d8e74e12dbbdc2",
+    "semantic_hash": "b0587882fddcbf63d2d8e74e12dbbdc2"
+  },
+  "fetched.txt": {
+    "mtime": 1791196957.9104626,
+    "seen": 1791272255.480728,
+    "ast_hash": "9054045a3ec9ecf341f0d6d6949d6c81",
+    "semantic_hash": "9054045a3ec9ecf341f0d6d6949d6c81"
+  },
+  "unfetched.txt": {
+    "mtime": 1791196958.2544627,
+    "seen": 1791272255.4807286,
+    "ast_hash": "e594930b15d74d7419c4c56caf379d7e",
+    "semantic_hash": "e594930b15d74d7419c4c56caf379d7e"
+  },
+  "web_interface/README.md": {
+    "mtime": 1791196958.2544627,
+    "seen": 1791272255.4807298,
+    "ast_hash": "468be098d232a25ebb3fa8a2e9882634",
+    "semantic_hash": "468be098d232a25ebb3fa8a2e9882634"
+  },
+  "web_interface/intelligent-antibodies-view/README.md": {
+    "mtime": 1791196958.2664628,
+    "seen": 1791272255.4807305,
+    "ast_hash": "9302ab77564b34981cb2c410c5e0e763",
+    "semantic_hash": "9302ab77564b34981cb2c410c5e0e763"
+  },
+  "web_interface/intelligent-antibodies-view/index.html": {
+    "mtime": 1791196958.2664628,
+    "seen": 1791272255.4807315,
+    "ast_hash": "559a763dc198210dd90978f31314c883",
+    "semantic_hash": "559a763dc198210dd90978f31314c883"
+  },
+  "app/graphics/logo.png": {
+    "mtime": 1791196957.7464628,
+    "seen": 1791272255.4807322,
+    "ast_hash": "cfc6b9ca7560a47208451c81a3d61d6e",
+    "semantic_hash": "cfc6b9ca7560a47208451c81a3d61d6e"
+  },
+  "app/graphics/logo.svg": {
+    "mtime": 1791196957.7464628,
+    "seen": 1791272255.4807327,
+    "ast_hash": "22966e7733e2fdae2b58e003c8b39a7b",
+    "semantic_hash": "22966e7733e2fdae2b58e003c8b39a7b"
+  },
+  "plots/Siamese_training.png": {
+    "mtime": 1791205883.430489,
+    "seen": 1791272255.4807334,
+    "ast_hash": "50dd71101fe266074585e4714bbbdfa6",
+    "semantic_hash": "50dd71101fe266074585e4714bbbdfa6"
+  },
+  "plots/Siamese_training_curve.png": {
+    "mtime": 1791205883.430489,
+    "seen": 1791272255.480734,
+    "ast_hash": "4d1d4447aff7f85eb423cdb0326955cc",
+    "semantic_hash": "4d1d4447aff7f85eb423cdb0326955cc"
+  },
+  "plots/Siamese_training_metrics.png": {
+    "mtime": 1791205883.434489,
+    "seen": 1791272255.480735,
+    "ast_hash": "bc525e80d4b368b86b5396adca124f32",
+    "semantic_hash": "bc525e80d4b368b86b5396adca124f32"
+  },
+  "plots/VAE_training_curve.png": {
+    "mtime": 1791205883.434489,
+    "seen": 1791272255.4807358,
+    "ast_hash": "cd72ac252231344413afaeed24c5373b",
+    "semantic_hash": "cd72ac252231344413afaeed24c5373b"
+  },
+  "web_interface/intelligent-antibodies-view/src/assets/loading.gif": {
+    "mtime": 1791196958.2704628,
+    "seen": 1791272255.4807363,
+    "ast_hash": "f4404720ece11355df318a0acf525cb1",
+    "semantic_hash": "f4404720ece11355df318a0acf525cb1"
+  },
+  "web_interface/intelligent-antibodies-view/src/assets/logo.png": {
+    "mtime": 1791196958.2704628,
+    "seen": 1791272255.480737,
+    "ast_hash": "cfc6b9ca7560a47208451c81a3d61d6e",
+    "semantic_hash": "cfc6b9ca7560a47208451c81a3d61d6e"
+  },
+  "web_interface/intelligent-antibodies-view/src/assets/logo.svg": {
+    "mtime": 1791196958.2704628,
+    "seen": 1791272255.4807374,
+    "ast_hash": "f8a4ea1900591283fd16d02eab9ab8ab",
+    "semantic_hash": "f8a4ea1900591283fd16d02eab9ab8ab"
+  }
+}

@@ -49,8 +49,21 @@ class EquilibratedDataset:
         
         data = data.merge(self.df_seq, left_on="ag", right_on="seq_id", how="inner")
         data.rename(columns={"sequence": "sequence_ag"}, inplace=True)
-        
-        return data[["sequence_ab", "sequence_ag", "interaction"]]
+
+        data = data[["sequence_ab", "sequence_ag", "interaction"]]
+
+        # Both merges above are many-to-many: `seq_id` is one row per CHAIN, so a
+        # single PDB id carries up to 9 of them. That turns 345k interaction rows
+        # into ~1.17M, of which ~358k are byte-identical duplicates -- and once
+        # train_test_split scatters copies of one pair across both sides, the
+        # validation score is partly just memorised training rows.
+        data = data.drop_duplicates()
+
+        # Chain-level duplication also lets the same (ab, ag) sequence pair arrive
+        # labelled both 1 and 0 (~955 pairs). No model can satisfy both, so drop
+        # them rather than training against contradictory ground truth.
+        conflicting = data.groupby(["sequence_ab", "sequence_ag"])["interaction"].transform("nunique") > 1
+        return data[~conflicting]
 
     def _equilibrate_data(self, data: pd.DataFrame) -> pd.DataFrame:
         """

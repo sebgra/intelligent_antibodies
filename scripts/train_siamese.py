@@ -20,6 +20,7 @@ import argparse
 
 import keras
 import matplotlib.pyplot as plt
+import numpy as np
 import tensorflow as tf
 from keras import layers
 from sklearn.model_selection import train_test_split
@@ -79,7 +80,12 @@ def plot_history(history, curve_path, metrics_path) -> None:
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--vector-size", type=int, default=200)
+    # 400, not 200: median antibody/antigen length is ~218/220 residues, so 200
+    # truncated over half of every sequence away. Note the VAE must be trained at
+    # the SAME size (scripts/train_vae.py --vector-size) or the pair won't be
+    # discoverable -- weights are stored per length and the dashboard only offers
+    # sizes that have both (see utils/paths.py::available_vector_sizes).
+    parser.add_argument("--vector-size", type=int, default=400)
     parser.add_argument("--filters", type=int, default=96)
     parser.add_argument("--epochs", type=int, default=100)
     parser.add_argument("--batch-size", type=int, default=64)
@@ -88,7 +94,7 @@ def main() -> None:
     parser.add_argument("--patience", type=int, default=5,
                          help="Early-stopping patience on validation loss.")
     parser.add_argument("--limit", type=int, default=None,
-                         help="Use only the first N training pairs (for a quick smoke test).")
+                         help="Use a random balanced subsample of N pairs (for a quick smoke test).")
     parser.add_argument("--seed", type=int, default=42)
     args = parser.parse_args()
 
@@ -99,7 +105,11 @@ def main() -> None:
     X, y, vector_size, alphabet_size = EquilibratedDataset(encoder).getdata(args.vector_size)
     x_ab, x_ag = X
     if args.limit:
-        x_ab, x_ag, y = x_ab[: args.limit], x_ag[: args.limit], y[: args.limit]
+        # EquilibratedDataset concatenates all positives then all negatives, so
+        # slicing the head returned a single-class subset -- and the stratified
+        # split below then died on it. Shuffle first so --limit stays balanced.
+        order = np.random.default_rng(args.seed).permutation(len(y))[: args.limit]
+        x_ab, x_ag, y = x_ab[order], x_ag[order], y[order]
     print(f"{len(y)} pair(s), alphabet_size={alphabet_size}, "
           f"positive rate={float(y.mean()):.2f} (should be ~0.5, equilibrated).")
 
@@ -108,14 +118,19 @@ def main() -> None:
     )
 
     input_dimensions = (vector_size, alphabet_size)
-    seq_input1 = layers.Input(shape=input_dimensions, name="seq_ag")
-    seq_input2 = layers.Input(shape=input_dimensions, name="seq_ab")
+    # Names follow the fit() order below ([x_train_ab, x_train_ag]); they used to
+    # be the other way round, which read as if the sides were swapped.
+    seq_input1 = layers.Input(shape=input_dimensions, name="seq_ab")
+    seq_input2 = layers.Input(shape=input_dimensions, name="seq_ag")
     siamese = SiameseInteractionClassifier(args.filters, seq_input1, seq_input2)
 
     SIAMESE_MODEL_DIR.mkdir(parents=True, exist_ok=True)
     out_path = siamese_weights_path(vector_size)
+    # Monitor val_loss, not val_mcc: the broken mcc returned a constant 0.0, so
+    # "max" improved once at epoch 1 and never again -- save_best_only then kept
+    # the epoch-1 weights for the whole run, whatever training did afterwards.
     checkpoint_callback = keras.callbacks.ModelCheckpoint(
-        str(out_path), monitor="val_mcc", mode="max", save_best_only=True,
+        str(out_path), monitor="val_loss", mode="min", save_best_only=True,
     )
     earlystop_callback = keras.callbacks.EarlyStopping(monitor="val_loss", patience=args.patience)
 
