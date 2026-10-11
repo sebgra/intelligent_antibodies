@@ -19,6 +19,7 @@ not a real prediction).
 from __future__ import annotations
 
 import re
+import time
 from dataclasses import dataclass
 from typing import List, Optional
 
@@ -26,6 +27,15 @@ import requests
 import streamlit as st
 
 ESMFOLD_API_URL = "https://api.esmatlas.com/foldSequence/v1/pdb/"
+
+# ESM Atlas's own API Gateway in front of this endpoint enforces a hard
+# ~29s integration timeout and returns 504 ("Endpoint request timed out")
+# past it -- independent of whatever client-side `timeout` is passed below.
+# Measured directly against the live API: a 90+ aa sequence 504'd three
+# times in a row under load, then succeeded in ~1s moments later once that
+# load passed. So a 504/502/503 here is normally transient server-side
+# congestion, not a sequence the API can never fold -- worth retrying.
+RETRYABLE_STATUS_CODES = {502, 503, 504}
 
 # Official AlphaFold/ESMFold per-residue confidence (pLDDT) color bins.
 PLDDT_BANDS = [
@@ -65,7 +75,9 @@ def _parse_ca_bfactors(pdb_text: str) -> List[float]:
 
 
 @st.cache_data(show_spinner=False, ttl=3600)
-def fold_sequence(sequence: str, timeout: float = 90.0) -> FoldResult:
+def fold_sequence(
+    sequence: str, timeout: float = 40.0, max_attempts: int = 3, retry_backoff: float = 3.0
+) -> FoldResult:
     """
     Predict a 3-D structure for `sequence` via the public ESMFold API.
 
@@ -73,6 +85,13 @@ def fold_sequence(sequence: str, timeout: float = 90.0) -> FoldResult:
     doesn't re-hit the network. Raises `FoldingError` on any network issue,
     timeout, or empty/invalid response -- callers should catch this and fall
     back to the schematic cartoon.
+
+    A 502/503/504 or a client-side timeout is retried up to `max_attempts`
+    times with a linear backoff (`retry_backoff * attempt` seconds between
+    tries), since the API gateway's own ~29s timeout means these are
+    typically transient server load, not a sequence it can never fold (see
+    `RETRYABLE_STATUS_CODES`). Any other HTTP error (e.g. a malformed
+    request) fails immediately instead of burning retries on it.
     """
     clean_sequence = re.sub(r"[^A-Za-z]", "", sequence).upper()
     if not clean_sequence:
@@ -83,13 +102,36 @@ def fold_sequence(sequence: str, timeout: float = 90.0) -> FoldResult:
             "that length. Try a shorter candidate."
         )
 
-    try:
-        response = requests.post(ESMFOLD_API_URL, data=clean_sequence, timeout=timeout)
-        response.raise_for_status()
-    except requests.RequestException as exc:
-        raise FoldingError(f"Could not reach the ESMFold API ({exc}).") from exc
+    pdb_text: Optional[str] = None
+    last_exc: Optional[Exception] = None
+    for attempt in range(1, max_attempts + 1):
+        try:
+            response = requests.post(ESMFOLD_API_URL, data=clean_sequence, timeout=timeout)
+            response.raise_for_status()
+            pdb_text = response.text
+            break
+        except requests.Timeout as exc:
+            last_exc = exc
+        except requests.HTTPError as exc:
+            status = exc.response.status_code if exc.response is not None else None
+            if status not in RETRYABLE_STATUS_CODES:
+                raise FoldingError(f"ESMFold API returned HTTP {status} ({exc}).") from exc
+            last_exc = exc
+        except requests.RequestException as exc:
+            # Connection-level failures (DNS, reset, etc.) -- also worth a retry.
+            last_exc = exc
 
-    pdb_text = response.text
+        if attempt < max_attempts:
+            time.sleep(retry_backoff * attempt)
+
+    if pdb_text is None:
+        raise FoldingError(
+            f"Could not reach the ESMFold API after {max_attempts} attempt(s) "
+            f"(last error: {last_exc}). This is ESM Atlas's free public API -- its gateway "
+            "times out requests at ~30s and can be overloaded. It's usually transient: wait a "
+            "moment and click 'Fold with ESMFold' again, or try a shorter candidate."
+        ) from last_exc
+
     plddt_raw = _parse_ca_bfactors(pdb_text)
     if not plddt_raw:
         raise FoldingError("ESMFold API returned no parseable structure for this sequence.")

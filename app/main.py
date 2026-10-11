@@ -14,9 +14,8 @@ shipped in `data/` and the real training-curve figures in `plots/`.
 """
 import json
 import sys
-import time
 from pathlib import Path
-from typing import List
+from typing import List, Optional
 
 import numpy as np
 import pandas as pd
@@ -41,6 +40,7 @@ from mock_results import (
     colorize_sequence_html,
     generate_candidates as generate_candidates_mock,
     predict_secondary_structure,
+    sanitize_antigen_sequence,
     schematic_backbone,
 )
 
@@ -213,6 +213,54 @@ def _selected_candidate_ids(event) -> List[str]:
     return sorted(set(ids))
 
 
+UNNAMED_FASTA_RECORD = "(unnamed sequence)"
+
+
+def parse_fasta(text: str) -> List[dict]:
+    """
+    Parse FASTA text into one record per ">" header, in file order.
+
+    Returns ``{"header", "id", "description", "sequence"}`` dicts, the sequence
+    already coerced onto the real encoder's alphabet by
+    `sanitize_antigen_sequence` (line breaks, gaps and lowercase in a FASTA file
+    would otherwise raise `KeyError` inside `ProteinOneHotEncoder.encode`).
+    Records with an empty sequence are dropped. Headerless input -- a bare
+    sequence pasted into a .fasta file -- is returned as a single unnamed
+    record rather than nothing at all.
+    """
+    records: List[dict] = []
+    header: Optional[str] = None
+    chunks: List[str] = []
+
+    def flush() -> None:
+        sequence = sanitize_antigen_sequence("".join(chunks))
+        if not sequence:
+            return
+        if header:
+            # FASTA convention: the identifier is the header up to the first
+            # space, everything after it is free-text description.
+            record_id, _, description = header.partition(" ")
+        else:
+            record_id, description = UNNAMED_FASTA_RECORD, ""
+        records.append({
+            "header": header or UNNAMED_FASTA_RECORD,
+            "id": record_id,
+            "description": description.strip(),
+            "sequence": sequence,
+        })
+
+    for line in text.splitlines():
+        line = line.strip()
+        if line.startswith(">"):
+            flush()
+            header = line[1:].strip()
+            chunks = []
+        elif line:
+            chunks.append(line)
+    flush()
+    return records
+
+
 @st.cache_data(show_spinner=False)
 def load_sabdab_stats():
     """Load and summarize the real SAbDab tables shipped in data/SAbDab."""
@@ -268,14 +316,60 @@ with tab_generate:
             height=100,
         )
         use_example = st.checkbox("Use bundled example antigen (lysozyme, 1A2Y chain C)")
-        st.caption("...or upload a FASTA file (first record is used).")
+        st.caption("...or upload a FASTA file, then pick which of its sequences to target.")
         uploaded_file = st.file_uploader(
             key="antigen_fasta_uploader", label="Choose a FASTA file", accept_multiple_files=False
         )
 
+        # Parsed at render time (not on launch) so the record picker below can
+        # be populated. `getvalue()` rather than `read()`: the buffer is not
+        # rewound between Streamlit reruns, so `read()` returns b"" the second
+        # time the script runs and the file silently looks empty.
+        fasta_records = []
+        fasta_record = None
+        if uploaded_file is not None:
+            fasta_records = parse_fasta(uploaded_file.getvalue().decode("utf-8", errors="ignore"))
+            if not fasta_records:
+                st.error(
+                    f"No usable sequence found in `{uploaded_file.name}` — expected FASTA records "
+                    "(a `>` header line followed by amino-acid lines)."
+                )
+            else:
+                with st.expander(
+                    f"📄 `{uploaded_file.name}` — {len(fasta_records)} sequence(s) found · "
+                    "choose which one to target",
+                    expanded=True,
+                ):
+                    record_index = st.selectbox(
+                        "Sequence from the FASTA file",
+                        options=list(range(len(fasta_records))),
+                        format_func=lambda i: (
+                            f"{i + 1}. {fasta_records[i]['header'][:70]}"
+                            f"{'...' if len(fasta_records[i]['header']) > 70 else ''}"
+                            f"  ·  {len(fasta_records[i]['sequence'])} aa"
+                        ),
+                        key="antigen_fasta_record",
+                        help="Multi-record FASTA files are read in full; only the record selected "
+                             "here is used as the target antigen.",
+                    )
+                    fasta_record = fasta_records[record_index]
+                    if fasta_record["description"]:
+                        st.caption(fasta_record["description"])
+                    st.code(fasta_record["sequence"], language=None, wrap_lines=True)
+                    st.caption(
+                        f"{len(fasta_record['sequence'])} aa — this record overrides the text box "
+                        "and the example checkbox."
+                    )
+
         col_a, col_b, col_c = st.columns(3)
         with col_a:
-            n_requested = st.slider("Candidates to return", min_value=5, max_value=50, value=20, step=5)
+            n_requested = int(st.number_input(
+                "Desired number of candidates", min_value=1, max_value=200, value=20, step=1,
+                help="A target, not a cap: sampling keeps running batch after batch until this "
+                     "many distinct candidates have cleared the interaction-score threshold "
+                     "(or a safety budget of batches is spent -- a very strict threshold can "
+                     "simply be unreachable for a given model).",
+            ))
         with col_b:
             threshold = st.slider(
                 "Interaction score threshold", min_value=0.50, max_value=0.99, value=0.80, step=0.01,
@@ -283,15 +377,32 @@ with tab_generate:
                      "the Siamese classifier's sigmoid score exceeds this value.",
             )
         with col_c:
-            vector_size = int(st.number_input(
-                "Sequence length (aa)", min_value=20, max_value=1000,
-                value=VECTOR_SIZE, step=10,
-                help="The one-hot encoding window (`vector_size`): the length of the generated "
-                     "sequences and the input width of both models. Weights are stored per "
-                     "length, so changing this loads the model trained for that length "
-                     "(train one with `--vector-size <length>`); lengths without trained "
-                     "weights fall back to simulated results.",
-            ))
+            # Weights are stored per encoding window, so the only windows that
+            # can actually be run are the ones that have been trained. List
+            # those instead of a free-form length that silently falls back to
+            # simulated results.
+            trained_sizes = real_pipeline.trained_vector_sizes()
+            if trained_sizes:
+                vector_size = int(st.selectbox(
+                    "Trained model (sequence length)",
+                    options=trained_sizes,
+                    index=trained_sizes.index(VECTOR_SIZE) if VECTOR_SIZE in trained_sizes else 0,
+                    format_func=lambda size: f"{size} aa window",
+                    help="The one-hot encoding window (`vector_size`): the length of the "
+                         "generated sequences and the input width of both models. Only windows "
+                         "with a complete set of trained VAE + Siamese weights under "
+                         "`run/models/` are listed; train another with "
+                         "`--vector-size <length>` to add it here.",
+                ))
+            else:
+                vector_size = int(st.number_input(
+                    "Sequence length (aa)", min_value=20, max_value=1000,
+                    value=VECTOR_SIZE, step=10,
+                    help="No trained weights were found under `run/models/`, so this is the "
+                         "window the *simulated* run will use. Once a model is trained "
+                         "(`--vector-size <length>`), this control becomes a list of the "
+                         "trained windows.",
+                ))
 
         temperature = st.slider(
             "Sampling temperature", min_value=0.2, max_value=2.0, value=1.0, step=0.1,
@@ -306,12 +417,22 @@ with tab_generate:
         elif temperature > 1.4:
             st.caption("🟠 Exploratory sampling — expect more diverse but less confident decodes.")
 
-        with st.expander("Encoding settings"):
+        with st.expander("Encoding & sampling-budget settings"):
             st.caption(
                 f"One-hot encoding · {vector_size} aa window · {ALPHABET_SIZE}-letter alphabet · "
                 "VAE latent dim 2 · Siamese CNN+GRU classifier "
                 "(see intelligent_antibodies/modules/models/)"
             )
+            max_attempts = int(st.number_input(
+                "Maximum sampling attempts (batches)",
+                min_value=1, max_value=500, value=max(20, n_requested * 4), step=5,
+                help="Generation samples repeatedly, in batches, until "
+                     "\"Desired number of candidates\" above is reached. This caps how many "
+                     "batches it will try before giving up -- raise it if a strict threshold "
+                     "keeps leaving the target unreached; lower it to fail fast instead of "
+                     "waiting through many unproductive batches. Each real-model batch samples "
+                     "10 candidates and costs roughly half a second.",
+            ))
 
         use_real = real_pipeline.models_available(vector_size)
         if use_real:
@@ -320,62 +441,65 @@ with tab_generate:
                 "generation will use them."
             )
         else:
-            trained = real_pipeline.trained_vector_sizes()
-            hint = (
-                f" Trained weights exist for {', '.join(f'{s} aa' for s in trained)} — set the "
-                "sequence length to one of those to run the real models."
-                if trained else
-                " Run `scripts/train_vae.py` and `scripts/train_siamese.py` to train real ones "
-                "(see README.md, \"Training the models\")."
-            )
             st.info(
                 f"ℹ️ No trained models for a {vector_size} aa window under `run/models/` — "
-                "showing **simulated** results." + hint
+                "showing **simulated** results. Run `scripts/train_vae.py` and "
+                "`scripts/train_siamese.py` to train real ones (see README.md, "
+                "\"Training the models\")."
             )
 
         launch = st.button("🚀 Launch generation", type="primary")
 
     if launch:
-        sequence = ""
-        if uploaded_file is not None:
-            raw = uploaded_file.read().decode("utf-8", errors="ignore")
-            sequence = "".join(
-                line.strip() for line in raw.splitlines() if line and not line.startswith(">")
-            )
+        # Precedence: the record picked out of an uploaded FASTA file, then the
+        # bundled example, then whatever was typed. Every path goes through
+        # `sanitize_antigen_sequence` (`parse_fasta` already did, for records),
+        # since the one-hot encoder only knows its own 22-letter alphabet.
+        if fasta_record is not None:
+            sequence = fasta_record["sequence"]
         elif use_example:
             sequence = EXAMPLE_ANTIGEN
-        elif antigen_input:
-            sequence = antigen_input.strip().upper()
+        else:
+            sequence = sanitize_antigen_sequence(antigen_input)
 
         if not sequence:
             st.warning("Please enter a sequence, check the example box, or upload a FASTA file.")
         else:
             progress = st.progress(0, text="Encoding antigen sequence...")
-            steps = [
-                (20, "Encoding antigen sequence..."),
-                (45, f"Sampling candidate antibodies (temperature={temperature:.1f})..."),
-                (75, "Scoring antibody-antigen interactions..."),
-                (100, "Ranking candidates..."),
-            ]
-            for pct, label in steps:
-                time.sleep(0.25 if not use_real else 0.05)
-                progress.progress(pct, text=label)
-            if use_real:
-                run = real_pipeline.generate_candidates_real(
-                    sequence, n_requested=n_requested, threshold=threshold,
-                    temperature=temperature, vector_size=vector_size,
+
+            def report_progress(n_found: int, n_target: int, pool_size: int) -> None:
+                """Real progress towards the requested number of candidates."""
+                pct = int(100 * min(n_found / max(n_target, 1), 1.0))
+                progress.progress(
+                    max(pct, 1),
+                    text=f"{n_found}/{n_target} candidates above threshold "
+                         f"({pool_size} sampled, temperature={temperature:.1f})...",
                 )
-            else:
-                run = generate_candidates_mock(
-                    sequence, n_requested=n_requested, threshold=threshold,
-                    temperature=temperature, vector_size=vector_size,
-                )
+
+            generate = (
+                real_pipeline.generate_candidates_real if use_real else generate_candidates_mock
+            )
+            run = generate(
+                sequence, n_requested=n_requested, threshold=threshold,
+                temperature=temperature, vector_size=vector_size,
+                max_batches=max_attempts, progress=report_progress,
+            )
             progress.empty()
             st.session_state["run"] = run
-            st.success(
-                f"Generated {run.n_passed} candidate(s) above threshold "
-                f"from a pool of {run.n_pool_generated}. See the **Results** tab."
-            )
+            if run.target_reached:
+                st.success(
+                    f"Reached the target: {run.n_passed} candidate(s) above threshold, from a "
+                    f"pool of {run.n_pool_generated} sampled over {run.batches_run} batch(es). "
+                    "See the **Results** tab."
+                )
+            else:
+                st.warning(
+                    f"Sampling budget spent after {run.batches_run} batches "
+                    f"({run.n_pool_generated} candidates sampled): only {run.n_passed} of the "
+                    f"{run.n_requested} requested cleared the {run.threshold:.2f} threshold. "
+                    "Lower the threshold, raise the sampling temperature, or ask for fewer "
+                    "candidates. Results so far are in the **Results** tab."
+                )
 
 # --------------------------------------------------------------------------
 # Results tab
@@ -404,9 +528,14 @@ with tab_results:
 
         meta_cols = st.columns(6)
         meta_cols[0].caption(f"**Antigen length**  \n{len(run.antigen_sequence)} aa")
-        meta_cols[1].caption(f"**Candidates requested**  \n{run.n_requested}")
+        meta_cols[1].caption(
+            f"**Candidates requested**  \n{run.n_requested}"
+            + ("" if run.target_reached else f" — {run.n_passed} found")
+        )
         meta_cols[2].caption(f"**Sequence length**  \n{run.vector_size} aa window")
-        meta_cols[3].caption(f"**Pool sampled**  \n{run.n_pool_generated}")
+        meta_cols[3].caption(
+            f"**Pool sampled**  \n{run.n_pool_generated} over {run.batches_run} batch(es)"
+        )
         meta_cols[4].caption(f"**Temperature**  \n{run.temperature:.1f}")
         meta_cols[5].caption(f"**Generation time**  \n{run.elapsed_seconds:.1f} s")
 
@@ -829,7 +958,11 @@ with tab_results:
 
                 if st.session_state.get(fold_key) == "requested":
                     try:
-                        with st.spinner("Calling the ESMFold API (this can take ~30-60s)..."):
+                        with st.spinner(
+                            "Calling the ESMFold API (usually ~30-60s; this free public API can "
+                            "be overloaded, so a slow or busy response is retried automatically "
+                            "-- worst case ~2 min)..."
+                        ):
                             fold_result = structure_prediction.fold_sequence(selected["sequence"])
                     except structure_prediction.FoldingError as exc:
                         st.error(f"Could not get a real fold: {exc}")

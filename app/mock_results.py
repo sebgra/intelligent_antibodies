@@ -33,7 +33,7 @@ from __future__ import annotations
 
 import time
 from dataclasses import dataclass, field
-from typing import List, Optional
+from typing import Callable, List, Optional
 
 import numpy as np
 import pandas as pd
@@ -87,12 +87,18 @@ RESIDUE_CLASS = {
     "G": "Special", "P": "Special",
 }
 RESIDUE_CLASS_ORDER = ["Positive", "Hydrophobic", "Polar", "Special", "Negative"]
+
+# Rendering fallback for letters the five classes above don't cover -- kept out
+# of RESIDUE_CLASS_ORDER on purpose, since that list drives the profile's
+# percentage columns and the sequence viewer's legend.
+RESIDUE_CLASS_UNKNOWN = "Non-standard"
 RESIDUE_CLASS_COLOR = {
     "Positive": "#2a78d6",      # categorical slot 1
     "Hydrophobic": "#eb6834",   # categorical slot 2
     "Polar": "#1baf7a",         # categorical slot 3
     "Special": "#eda100",       # categorical slot 4
     "Negative": "#e87ba4",      # categorical slot 5
+    RESIDUE_CLASS_UNKNOWN: "#898781",   # grey -- outside the 20 standard AAs
 }
 
 # Approximate Chou & Fasman (1978) conformational propensities. Used only to
@@ -113,6 +119,56 @@ SS_COLOR = {"Helix": "#e34948", "Sheet": "#eda100", "Coil": "#898781"}
 SS_LABEL = {"H": "Helix", "E": "Sheet", "C": "Coil"}
 
 
+# --------------------------------------------------------------------------
+# Sequence sanitizing.
+#
+# The real encoder's alphabet (encoding.AMINO_ACID_ALPHABET) has 22 letters:
+# the 20 standard amino acids plus 'X' (its padding / unknown placeholder) and
+# 'U' (selenocysteine). Two consequences the panels above have to survive:
+#
+# - A real VAE decode is an argmax over all 22 letters at every one of the
+#   `vector_size` positions, so decoded sequences legitimately contain X and U.
+#   The per-residue tables above are keyed on the 20 standard residues, so
+#   feeding a raw decode straight to `physicochemical_profile` raised
+#   `KeyError: 'X'`. `clean_generated_sequence` is what real_pipeline runs
+#   every decode through before it reaches a DataFrame or the UI.
+# - A user-supplied antigen (typed, pasted, or read from a FASTA file) can
+#   carry lowercase letters, gaps, '*', line breaks or ambiguity codes, none of
+#   which `ProteinOneHotEncoder.encode` knows -- it would raise `KeyError` too.
+#   `sanitize_antigen_sequence` maps those onto the alphabet instead.
+# --------------------------------------------------------------------------
+
+def sanitize_antigen_sequence(sequence: str) -> str:
+    """
+    Coerce a user-supplied sequence into the real encoder's 22-letter alphabet.
+
+    Uppercases; drops anything that isn't a letter (whitespace, digits, gaps
+    such as ``-``/``.``, stop codons ``*``); and folds any remaining unknown
+    letter -- the ambiguity codes B/Z/J/O, for instance -- onto ``X``, the
+    alphabet's own unknown placeholder, which preserves the residue's position
+    rather than silently shortening the sequence.
+    """
+    return "".join(
+        char if char in _REAL_ALPHABET else "X"
+        for char in sequence.upper()
+        if char.isalpha()
+    )
+
+
+def clean_generated_sequence(sequence: str) -> str:
+    """
+    Turn a raw VAE decode into a sequence of standard amino acids only.
+
+    ``U`` (selenocysteine) is folded onto ``C``, exactly as
+    `encoding.NLFEncoder` / `encoding.BLOSUMEncoder` already do. ``X`` is the
+    encoder's padding placeholder -- a decoded position the model is really
+    saying is empty -- so it is dropped rather than substituted, which also
+    trims the padding tail off a decode shorter than the encoding window. The
+    result may be empty if a decode is all padding; callers skip those.
+    """
+    return "".join(aa for aa in sequence.upper().replace("U", "C") if aa in AMINO_ACIDS)
+
+
 @dataclass
 class GenerationRun:
     """A single mock generation call: its parameters, results, and pool."""
@@ -128,6 +184,8 @@ class GenerationRun:
     vector_size: int = VECTOR_SIZE   # encoding window / requested sequence length
     model_tag: str = "mock-generator-v0 (VAE+Siamese not yet connected)"
     timestamp: float = field(default_factory=time.time)
+    batches_run: int = 1             # sampling rounds spent reaching n_requested
+    target_reached: bool = True      # False if the sampling budget ran out first
 
     @property
     def n_passed(self) -> int:
@@ -175,6 +233,52 @@ def tier_for_score(score: float) -> str:
     return "Candidate"
 
 
+def _sample_round(
+    rng: np.random.Generator,
+    center: np.ndarray,
+    size: int,
+    temperature: float,
+    threshold: float,
+    lo: int,
+    hi: int,
+) -> pd.DataFrame:
+    """
+    One round of simulated latent sampling + scoring (see `generate_candidates`).
+
+    Split out so the rejection-sampling loop can draw as many rounds as it
+    takes to reach the requested number of passing candidates.
+    """
+    # --- Latent-space sampling, exactly as inference.generate_antibody_sequence ---
+    z = temperature * rng.normal(size=(size, LATENT_DIM))
+
+    # --- Fake "interaction score", modelled as a smooth function of latent
+    # position so the latent-space plot has structure to show: a hidden
+    # antigen-favorable region, found via the usual rejection sampling. ---
+    dist_to_center = np.linalg.norm(z - center, axis=1)
+    score_logit = 4.0 - 2.6 * dist_to_center + rng.normal(0, 0.7, size=size)
+    scores = np.clip(1 / (1 + np.exp(-score_logit)), 0.01, 0.995)
+
+    # --- Fake decode confidence: decays with distance from the prior's
+    # mode, i.e. with how far temperature pushed the sample into the tails. ---
+    dist_from_origin = np.linalg.norm(z, axis=1)
+    decode_confidence = np.clip(
+        0.96 - 0.11 * dist_from_origin + rng.normal(0, 0.04, size=size), 0.15, 0.99
+    )
+
+    lengths = rng.integers(max(lo, 1), hi + 1, size=size)
+    sequences = [_random_sequence(rng, int(length)) for length in lengths]
+
+    return pd.DataFrame({
+        "z1": z[:, 0],
+        "z2": z[:, 1],
+        "sequence": sequences,
+        "length": lengths,
+        "interaction_score": scores,
+        "decode_confidence": decode_confidence,
+        "passed": scores >= threshold,
+    })
+
+
 def generate_candidates(
     antigen_sequence: str,
     n_requested: int = 20,
@@ -184,15 +288,20 @@ def generate_candidates(
     min_length: Optional[int] = None,
     max_length: Optional[int] = None,
     vector_size: int = VECTOR_SIZE,
+    max_batches: int = 40,
+    progress: Optional[Callable[[int, int, int], None]] = None,
 ) -> GenerationRun:
     """
     Simulate a batch antibody-generation run against a given antigen.
 
     Mirrors the real rejection-sampling loop in
-    `inference.get_unique_interacting_antibodies`: a pool of latent points is
-    sampled at the given `temperature`, each is "decoded" into a sequence and
-    scored for predicted interaction with the antigen, and only candidates
-    clearing `threshold` are kept (capped at `n_requested`).
+    `inference.get_unique_interacting_antibodies`: latent points are sampled at
+    the given `temperature`, each is "decoded" into a sequence and scored for
+    predicted interaction with the antigen, and only candidates clearing
+    `threshold` are kept. Sampling keeps going round after round until
+    `n_requested` candidates have passed (or `max_batches` rounds have been
+    spent), so `n_requested` is a target to reach rather than just a cap --
+    matching `real_pipeline.generate_candidates_real`.
 
     Parameters
     ----------
@@ -216,6 +325,17 @@ def generate_candidates(
         The one-hot encoding window the real models would use, i.e. the
         requested generated-sequence length. Simulated sequences never
         exceed it, since the real encoder truncates at that width.
+    max_batches : int
+        Safety budget: at most this many sampling rounds ("attempts") are
+        spent looking for `n_requested` passing candidates. A strict
+        `threshold` can be unreachable, so the loop must be bounded;
+        `GenerationRun.target_reached` says whether the target was actually
+        met. Named to match `real_pipeline.generate_candidates_real`'s
+        `max_batches`, so a caller (e.g. the dashboard's "max attempts"
+        control) can pass the same value to either generator.
+    progress : callable, optional
+        Called as ``progress(n_passed, n_requested, pool_size)`` after every
+        round, so a caller can report real progress towards the target.
 
     Returns
     -------
@@ -226,48 +346,40 @@ def generate_candidates(
         seed = int(np.random.default_rng().integers(0, 2**32 - 1))
     rng = np.random.default_rng(seed)
 
-    pool_size = max(80, n_requested * 8)
-
-    # --- Latent-space sampling, exactly as inference.generate_antibody_sequence ---
-    z = temperature * rng.normal(size=(pool_size, LATENT_DIM))
-
-    # --- Fake "interaction score", modelled as a smooth function of latent
-    # position so the latent-space plot has structure to show: a hidden
-    # antigen-favorable region, found via the usual rejection sampling. ---
-    center = rng.normal(0, 0.5, size=LATENT_DIM)
-    dist_to_center = np.linalg.norm(z - center, axis=1)
-    score_logit = 4.0 - 2.6 * dist_to_center + rng.normal(0, 0.7, size=pool_size)
-    scores = 1 / (1 + np.exp(-score_logit))
-    scores = np.clip(scores, 0.01, 0.995)
-
-    # --- Fake decode confidence: decays with distance from the prior's
-    # mode, i.e. with how far temperature pushed the sample into the tails. ---
-    dist_from_origin = np.linalg.norm(z, axis=1)
-    decode_confidence = np.clip(
-        0.96 - 0.11 * dist_from_origin + rng.normal(0, 0.04, size=pool_size), 0.15, 0.99
-    )
-
     # Default bounds track the encoding window: the 0.52-0.68 ratios reproduce
     # the previous fixed 105-135 aa range at the default 200 aa window (roughly
     # a real antibody chain), and stay proportionate for any other window.
     hi = min(max_length if max_length is not None else round(0.68 * vector_size), vector_size)
     lo = min(min_length if min_length is not None else round(0.52 * vector_size), hi)
-    lengths = rng.integers(max(lo, 1), hi + 1, size=pool_size)
-    sequences = [_random_sequence(rng, int(length)) for length in lengths]
 
-    pool = pd.DataFrame({
-        "z1": z[:, 0],
-        "z2": z[:, 1],
-        "sequence": sequences,
-        "length": lengths,
-        "interaction_score": scores,
-        "decode_confidence": decode_confidence,
-        "passed": scores >= threshold,
-    })
+    # The hidden antigen-favorable region of latent space. Drawn once, outside
+    # the sampling loop, so every round samples against the same "truth".
+    center = rng.normal(0, 0.5, size=LATENT_DIM)
+
+    round_size = max(80, n_requested * 8)
+
+    # Rejection sampling towards the target: keep drawing rounds until
+    # n_requested candidates have passed, bounded by max_batches.
+    rounds: List[pd.DataFrame] = []
+    n_found = 0
+    rounds_run = 0
+    # `not rounds` keeps a degenerate n_requested <= 0 from leaving the pool
+    # (and therefore every downstream plot) empty.
+    while not rounds or (n_found < n_requested and rounds_run < max_batches):
+        chunk = _sample_round(rng, center, round_size, temperature, threshold, lo, hi)
+        rounds.append(chunk)
+        rounds_run += 1
+        n_found += int(chunk["passed"].sum())
+        if progress is not None:
+            progress(min(n_found, n_requested), n_requested, round_size * rounds_run)
+
+    pool = pd.concat(rounds, ignore_index=True)
+    pool_size = len(pool)
 
     passed = (
         pool[pool["passed"]]
         .sort_values("interaction_score", ascending=False)
+        .drop_duplicates(subset="sequence")
         .head(n_requested)
         .reset_index(drop=True)
         .drop(columns="passed")
@@ -279,11 +391,18 @@ def generate_candidates(
         position_confidence_trace(conf, int(length), seed=rng.integers(0, 2**32 - 1))
         for conf, length in zip(passed["decode_confidence"], passed["length"])
     ]
-    profiles = pd.DataFrame([physicochemical_profile(seq) for seq in passed["sequence"]])
-    passed["hydrophobicity"] = profiles["hydrophobicity"]
-    passed["net_charge"] = profiles["net_charge"]
+    # A strict threshold can exhaust the sampling budget with nothing passing;
+    # an empty frame has no columns to read, so the columns are declared
+    # explicitly (same guard as real_pipeline.generate_candidates_real).
+    if not passed.empty:
+        profiles = pd.DataFrame([physicochemical_profile(seq) for seq in passed["sequence"]])
+        passed["hydrophobicity"] = profiles["hydrophobicity"]
+        passed["net_charge"] = profiles["net_charge"]
+    else:
+        passed["hydrophobicity"] = pd.Series(dtype=float)
+        passed["net_charge"] = pd.Series(dtype=int)
 
-    # Simulated compute time, scaling gently with pool size.
+    # Simulated compute time, scaling gently with how much sampling it took.
     elapsed = 0.8 + pool_size / 400 + rng.uniform(-0.2, 0.4)
 
     return GenerationRun(
@@ -297,6 +416,8 @@ def generate_candidates(
         elapsed_seconds=max(elapsed, 0.3),
         vector_size=vector_size,
         model_tag=f"mock-generator-v0 (VAE+Siamese not yet connected, vector_size={vector_size})",
+        batches_run=rounds_run,
+        target_reached=len(passed) >= n_requested,
     )
 
 
@@ -310,11 +431,21 @@ def physicochemical_profile(sequence: str) -> dict:
     Real, simple per-sequence properties (not model output): mean Kyte-Doolittle
     hydrophobicity and an approximate net charge at physiological pH
     (``+1`` per K/R/H, ``-1`` per D/E -- a common coarse estimate).
+
+    Only standard residues are scored: the input is run through
+    `clean_generated_sequence` first, so a raw VAE decode containing the
+    encoder's X/U letters is handled instead of raising `KeyError`. A sequence
+    with no scorable residue at all yields a neutral, all-zero profile.
     """
-    hydrophobicity = np.mean([KYTE_DOOLITTLE[aa] for aa in sequence])
-    net_charge = sum(1 for aa in sequence if aa in "KRH") - sum(1 for aa in sequence if aa in "DE")
-    class_counts = pd.Series([RESIDUE_CLASS[aa] for aa in sequence]).value_counts(normalize=True) * 100
-    class_pct = {cls: float(class_counts.get(cls, 0.0)) for cls in RESIDUE_CLASS_ORDER}
+    residues = clean_generated_sequence(sequence)
+    class_pct = {cls: 0.0 for cls in RESIDUE_CLASS_ORDER}
+    if not residues:
+        return {"hydrophobicity": 0.0, "net_charge": 0, **class_pct}
+
+    hydrophobicity = np.mean([KYTE_DOOLITTLE[aa] for aa in residues])
+    net_charge = sum(1 for aa in residues if aa in "KRH") - sum(1 for aa in residues if aa in "DE")
+    class_counts = pd.Series([RESIDUE_CLASS[aa] for aa in residues]).value_counts(normalize=True) * 100
+    class_pct.update({cls: float(class_counts.get(cls, 0.0)) for cls in RESIDUE_CLASS_ORDER})
     return {"hydrophobicity": float(hydrophobicity), "net_charge": int(net_charge), **class_pct}
 
 
@@ -323,11 +454,15 @@ def predict_secondary_structure(sequence: str, window: int = 4, min_run: int = 3
     Simplified Chou-Fasman-style secondary-structure call per residue
     (returns 'H'/'E'/'C'). Deliberately approximate -- intended only to drive
     an illustrative schematic "fold" view, not a real structure prediction.
+
+    One label per input residue, so the result stays aligned with `sequence`
+    for the viewer: a non-standard letter (X/U from the encoder's alphabet, or
+    anything else) is given a neutral propensity of 1.0 rather than dropped.
     """
     n = len(sequence)
     half = window // 2
-    helix_scores = np.array([CHOU_FASMAN_HELIX[aa] for aa in sequence])
-    sheet_scores = np.array([CHOU_FASMAN_SHEET[aa] for aa in sequence])
+    helix_scores = np.array([CHOU_FASMAN_HELIX.get(aa, 1.0) for aa in sequence])
+    sheet_scores = np.array([CHOU_FASMAN_SHEET.get(aa, 1.0) for aa in sequence])
 
     labels = []
     for i in range(n):
@@ -399,18 +534,24 @@ def schematic_backbone(sequence: str, ss: Optional[List[str]] = None, seed: int 
     })
 
 
+def _residue_color(aa: str) -> str:
+    """Viewer colour for a residue; non-standard letters render grey."""
+    return RESIDUE_CLASS_COLOR[RESIDUE_CLASS.get(aa, RESIDUE_CLASS_UNKNOWN)]
+
+
 def colorize_sequence_html(sequence: str, width: int = 60) -> str:
     """
     Render a sequence as monospace HTML colored by physicochemical residue
     class (see RESIDUE_CLASS), chunked into fixed-width rows with a position
-    ruler -- a standard colored sequence-viewer layout.
+    ruler -- a standard colored sequence-viewer layout. Every input character
+    is rendered, non-standard ones in grey, so the ruler stays truthful.
     """
     rows = []
     for start in range(0, len(sequence), width):
         chunk = sequence[start:start + width]
         spans = "".join(
-            f'<span style="background:{RESIDUE_CLASS_COLOR[RESIDUE_CLASS[aa]]}22;'
-            f'color:{RESIDUE_CLASS_COLOR[RESIDUE_CLASS[aa]]};'
+            f'<span style="background:{_residue_color(aa)}22;'
+            f'color:{_residue_color(aa)};'
             f'font-weight:600;padding:1px 0;">{aa}</span>'
             for aa in chunk
         )
@@ -438,4 +579,29 @@ if __name__ == "__main__":
     # Explicit bounds are still clamped to the window.
     run = generate_candidates("ACDEFGHIKL", seed=1, vector_size=50, min_length=105, max_length=135)
     assert run.pool["length"].max() <= 50
+
+    # Sampling runs until the requested number of candidates has passed...
+    run = generate_candidates("ACDEFGHIKL", n_requested=45, threshold=0.93, seed=2)
+    assert run.n_passed == 45 and run.target_reached, (run.n_passed, run.target_reached)
+    # ...but an unreachable threshold exhausts the budget instead of hanging.
+    run = generate_candidates("ACDEFGHIKL", n_requested=50, threshold=0.995, seed=2, max_batches=2)
+    assert not run.target_reached and run.batches_run == 2
+    assert {"hydrophobicity", "net_charge"} <= set(run.candidates.columns)
+
+    # Raw VAE decodes carry the encoder's X/U letters (see clean_generated_sequence);
+    # the per-residue panels must characterize them instead of raising KeyError.
+    raw_decode = "ARNDCUKRH" + "X" * 30
+    assert clean_generated_sequence(raw_decode) == "ARNDCCKRH"
+    profile = physicochemical_profile(raw_decode)
+    assert profile["net_charge"] == 3, profile   # R/K/R/H minus D
+    assert physicochemical_profile("XXXX")["hydrophobicity"] == 0.0
+    assert len(predict_secondary_structure(raw_decode)) == len(raw_decode)
+    assert len(schematic_backbone(raw_decode)) == len(raw_decode)
+    assert colorize_sequence_html(raw_decode)
+
+    # A user-supplied antigen is coerced onto the encoder's 22-letter alphabet.
+    assert sanitize_antigen_sequence("mkv fgr-cel*aaa\n") == "MKVFGRCELAAA"
+    assert sanitize_antigen_sequence("ABZJO") == "AXXXX"   # ambiguity codes -> X
+    assert set(sanitize_antigen_sequence("acdefghiklZ")) <= set(_REAL_ALPHABET)
+
     print("mock_results self-check OK")
