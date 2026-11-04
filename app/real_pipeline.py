@@ -22,12 +22,16 @@ import numpy as np
 import pandas as pd
 import streamlit as st
 
+import json
+
 from intelligent_antibodies.modules.main_pipeline import load_models
 from intelligent_antibodies.modules.utils.encoding import ProteinOneHotEncoder
 from intelligent_antibodies.modules.utils.inference import generate_antibody_sequence, test_interaction
 from intelligent_antibodies.modules.utils.paths import (
     available_vector_sizes,
+    siamese_calibration_path,
     trained_models_available,
+    vae_latent_stats_path,
 )
 
 from mock_results import (
@@ -58,6 +62,79 @@ def _cached_models(vector_size: int = 200) -> Dict:
     return load_models(vector_size)
 
 
+@st.cache_data(show_spinner=False)
+def score_calibration(vector_size: int = 200) -> Optional[Dict]:
+    """
+    What the trained classifier's scores look like on held-out pairs, as
+    recorded by `scripts/train_siamese.py` -- or None for a model trained
+    before calibration was written out.
+
+    This is what makes the threshold slider honest. A classifier whose scores
+    never exceed 0.69 cannot satisfy a 0.80 threshold no matter how many
+    batches are sampled, and that was exactly the reported failure: 800
+    candidates sampled, 0 kept.
+    """
+    path = siamese_calibration_path(vector_size)
+    if not path.exists():
+        return None
+    try:
+        calibration = json.loads(path.read_text())
+    except (json.JSONDecodeError, OSError):
+        return None
+
+    # Derive the candidate-selection threshold for calibration files written
+    # before it was recorded, so an older trained model still gets a
+    # precision-oriented default rather than Youden's balanced one.
+    if "selection_threshold" not in calibration:
+        candidates = [
+            op for op in calibration.get("operating_points", [])
+            if op.get("kept_fraction", 0) >= 0.25
+        ]
+        if candidates:
+            best = max(candidates, key=lambda op: op["precision"])
+            calibration["selection_threshold"] = best["threshold"]
+            calibration["selection_precision"] = best["precision"]
+        else:
+            calibration["selection_threshold"] = calibration.get("recommended_threshold")
+            calibration["selection_precision"] = calibration.get("recommended_precision")
+    return calibration
+
+
+def available_chain_types(vector_size: int = 250) -> list:
+    """Chain families this model recorded a latent centre for, if any."""
+    stats = latent_statistics(vector_size) or {}
+    return sorted((stats.get("by_chain_type") or {}))
+
+
+@st.cache_data(show_spinner=False)
+def latent_statistics(vector_size: int = 200) -> Optional[Dict]:
+    """
+    The VAE's aggregate posterior, as recorded by `scripts/train_vae.py`.
+
+    Generation samples the latent space; doing that from N(0, 1) only makes
+    sense if the encoder's output actually resembles N(0, 1), and nothing
+    enforces that. Measured on the trained weights: the 200 aa model sits at
+    a per-dimension std of ~1.74, the 400 aa model at ~1.03. Sampling from
+    the recorded statistics rather than a bare unit prior keeps draws on the
+    manifold the decoder was trained on however the KL term turned out.
+    """
+    path = vae_latent_stats_path(vector_size)
+    if not path.exists():
+        return None
+    try:
+        return json.loads(path.read_text())
+    except (json.JSONDecodeError, OSError):
+        return None
+
+
+def recommended_threshold(vector_size: int = 200, default: float = 0.80) -> float:
+    """The calibrated operating point for this model, or `default` if unknown."""
+    calibration = score_calibration(vector_size)
+    if not calibration:
+        return default
+    return float(calibration.get("recommended_threshold", default))
+
+
 def generate_candidates_real(
     antigen_sequence: str,
     n_requested: int = 20,
@@ -67,6 +144,8 @@ def generate_candidates_real(
     batch_size: int = 10,
     max_batches: Optional[int] = None,
     max_seconds: float = 120.0,
+    residue_temperature: float = 0.0,
+    chain_type: Optional[str] = None,
     progress: Optional[Callable[[int, int, int], None]] = None,
 ) -> GenerationRun:
     """
@@ -107,6 +186,9 @@ def generate_candidates_real(
     # unreachable threshold spin forever.
     max_batches = max_batches or max(20, n_requested * 4)
     deadline = t0 + max_seconds
+    # Sample where the training data actually lies, not from a unit prior the
+    # encoder never matched (see `latent_statistics`).
+    stats = latent_statistics(vector_size)
 
     rows: List[Dict] = []
     unique_passed: set[str] = set()
@@ -120,12 +202,14 @@ def generate_candidates_real(
         for sequence, onehot, z_point, decode_confidence in generate_antibody_sequence(
             n=batch_size, vae_model=models["vae_full"].vae, encoder=encoder,
             vector_size=vector_size, temperature=temperature,
+            latent_stats=stats, residue_temperature=residue_temperature,
+            chain_type=chain_type,
         ):
-            # Score the decode exactly as the model produced it (padding
-            # included -- that is the tensor the Siamese classifier saw), but
-            # report the cleaned sequence: a raw decode is an argmax over the
-            # full 22-letter alphabet, so it carries the encoder's 'X' padding
-            # and 'U' placeholders, which no per-residue scale is keyed on.
+            # `generate_antibody_sequence` already strips the decode's 'X'/'U'
+            # placeholders before encoding, so `onehot` is zero-padded exactly
+            # like every pair the Siamese classifier was trained on. Scoring
+            # the raw X-padded decode instead put the input out of
+            # distribution and returned 0.000 for every candidate.
             _, score = test_interaction(onehot, onehot_antigen, models["siamese"], threshold=threshold)
             residues = clean_generated_sequence(sequence)
             if not residues:
@@ -188,4 +272,5 @@ def generate_candidates_real(
         model_tag=f"real (trained weights, run/models/, vector_size={vector_size})",
         batches_run=batches_run,
         target_reached=len(passed) >= n_requested,
+        calibration=score_calibration(vector_size),
     )

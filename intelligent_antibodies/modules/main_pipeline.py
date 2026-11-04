@@ -14,35 +14,42 @@ CLI usage
         --antigen-id 6xe1 --n-candidates 20 --threshold 0.8 --temperature 1.0
 """
 import argparse
+import json
 from typing import Dict, List, Optional
 
 import keras
 import pandas as pd
-import tensorflow as tf
-from keras import layers
 
 from intelligent_antibodies.modules.models.SiameseInteractionClassifier import f1, mcc
 from intelligent_antibodies.modules.models.VAEFull import VAEFull
 from intelligent_antibodies.modules.utils.encoding import ProteinOneHotEncoder
+from intelligent_antibodies.modules.utils.gpu import configure_compute
 from intelligent_antibodies.modules.utils.inference import get_unique_interacting_antibodies
-from intelligent_antibodies.modules.utils.paths import SABDAB_DIR, siamese_weights_path, vae_weights_path
+from intelligent_antibodies.modules.utils.paths import (
+    SABDAB_DIR,
+    siamese_weights_path,
+    vae_latent_stats_path,
+    vae_weights_path,
+)
 
 
-def _limit_gpu_memory(mb: int = 5120) -> None:
-    gpus = tf.config.experimental.list_physical_devices("GPU")
-    if not gpus:
-        return
+def _load_latent_stats(vector_size: int) -> Optional[Dict]:
+    """The VAE's recorded aggregate posterior, if `train_vae.py` wrote one."""
+    path = vae_latent_stats_path(vector_size)
+    if not path.exists():
+        return None
     try:
-        tf.config.experimental.set_virtual_device_configuration(
-            gpus[0], [tf.config.experimental.VirtualDeviceConfiguration(memory_limit=mb)]
-        )
-    except RuntimeError as exc:
-        print(f"Could not set GPU memory limit ({exc}); continuing with default config.")
+        return json.loads(path.read_text())
+    except (json.JSONDecodeError, OSError):
+        return None
 
 
 def load_models(vector_size: int = 200) -> Dict:
     """Load the trained VAE decoder and Siamese classifier from `run/models/`."""
-    _limit_gpu_memory()
+    # Was a hardcoded 5120 MB virtual-device cap, which silently did nothing on
+    # a card smaller than that and nothing at all on CPU. Now a single shared
+    # 50%-of-the-machine budget -- see utils/gpu.py.
+    configure_compute()
 
     # Derived from the encoder itself (22 letters, see encoding.AMINO_ACID_ALPHABET)
     # rather than hardcoded, so it can't silently drift out of sync with it.
@@ -82,6 +89,8 @@ def run_pipeline(
     threshold: float = 0.8,
     temperature: float = 1.0,
     limit: int = 20,
+    residue_temperature: float = 0.0,
+    chain_type: Optional[str] = None,
 ) -> List[Dict]:
     """
     Generate up to `n_candidates` antibody sequences predicted to interact
@@ -124,6 +133,12 @@ def run_pipeline(
         temperature=temperature,
         threshold=threshold,
         max_candidates=n_candidates,
+        vector_size=vector_size,
+        # Sample where the data actually lies rather than from a unit prior
+        # the encoder never matched (see inference.sample_latent).
+        latent_stats=_load_latent_stats(vector_size),
+        residue_temperature=residue_temperature,
+        chain_type=chain_type,
     )
 
 
@@ -138,6 +153,12 @@ def _parse_args() -> argparse.Namespace:
     parser.add_argument("--limit", type=int, default=20,
                          help="Number of 10-candidate generation batches to attempt.")
     parser.add_argument("--vector-size", type=int, default=200)
+    parser.add_argument("--chain-type", choices=("heavy", "light"), default=None,
+                         help="Generate only heavy or only light chains. Without it, sampling "
+                              "returns an uncontrolled mixture of both.")
+    parser.add_argument("--residue-temperature", type=float, default=0.0,
+                         help="Above 0, sample each residue from the decoder's distribution "
+                              "instead of taking the argmax (more distinct candidates).")
     return parser.parse_args()
 
 
@@ -151,6 +172,8 @@ def main() -> None:
         antigen_sequence, models=models, vector_size=args.vector_size,
         n_candidates=args.n_candidates,
         threshold=args.threshold, temperature=args.temperature, limit=args.limit,
+        residue_temperature=args.residue_temperature,
+        chain_type=args.chain_type,
     )
 
     print(f"Generated {len(candidates)} candidate(s) above threshold {args.threshold}:")

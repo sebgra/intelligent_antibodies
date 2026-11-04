@@ -32,6 +32,33 @@ def siamese_weights_path(vector_size: int = 200) -> Path:
     return SIAMESE_MODEL_DIR / f"one-hot-{vector_size}-model.h5"
 
 
+def siamese_calibration_path(vector_size: int = 200) -> Path:
+    """
+    Where `scripts/train_siamese.py` records what the trained classifier's
+    scores actually look like (held-out AUC, score percentiles, useful
+    operating points).
+
+    Without this the dashboard's "interaction score threshold" is a guess: a
+    classifier whose scores never leave 0.47-0.69 can never clear 0.80, so a
+    run returns nothing with no hint as to why. The app reads this file to
+    show the model's real score range and recommend a threshold.
+    """
+    return SIAMESE_MODEL_DIR / f"one-hot-{vector_size}-calibration.json"
+
+
+def vae_latent_stats_path(vector_size: int = 200) -> Path:
+    """
+    Where `scripts/train_vae.py` records the VAE's aggregate posterior
+    (per-dimension mean/std of `z_mean` over the training set).
+
+    Sampling assumes the latent space matches the N(0, 1) prior. When the
+    reconstruction term dominates the KL term that is not true, and sampling
+    from N(0, 1) lands in regions the decoder never saw. Generation uses these
+    statistics to sample where the data actually lives instead.
+    """
+    return VAE_MODEL_DIR / f"vae-one-hot-{vector_size}-latent-stats.json"
+
+
 def trained_models_available(vector_size: int = 200) -> bool:
     """True if both the VAE and Siamese weight files exist on disk."""
     vae_base = vae_weights_path(vector_size)

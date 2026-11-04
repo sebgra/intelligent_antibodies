@@ -186,6 +186,11 @@ class GenerationRun:
     timestamp: float = field(default_factory=time.time)
     batches_run: int = 1             # sampling rounds spent reaching n_requested
     target_reached: bool = True      # False if the sampling budget ran out first
+    # What the trained classifier's scores actually look like on held-out
+    # pairs (written by scripts/train_siamese.py; None for a mock run). The
+    # UI needs it to explain an empty result: a classifier whose scores top
+    # out at 0.69 can never clear a 0.80 threshold, however long it samples.
+    calibration: Optional[dict] = None
 
     @property
     def n_passed(self) -> int:
@@ -194,6 +199,13 @@ class GenerationRun:
     @property
     def n_pool_generated(self) -> int:
         return len(self.pool)
+
+    @property
+    def best_score(self) -> float:
+        """Highest score in the whole sampled pool, passing or not."""
+        if self.pool.empty or "interaction_score" not in self.pool:
+            return float("nan")
+        return float(self.pool["interaction_score"].max())
 
 
 def _random_sequence(rng: np.random.Generator, length: int) -> str:

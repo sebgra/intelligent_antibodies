@@ -70,6 +70,12 @@ TIER_COLOR = {
 }
 TIER_ORDER = ["Lead candidate", "High confidence", "Candidate"]
 
+# An antibody's variable domain -- the part carrying the CDR loops that do the
+# binding -- is roughly the first 110-130 residues of a chain. Used as the
+# fallback fragment length when the public folding API cannot finish a
+# full-length chain inside its ~29s gateway timeout.
+FV_DOMAIN_LENGTH = 120
+
 EXAMPLE_ANTIGEN = (
     "KVFGRCELAAAMKRHGLANYRGYSLGNWVCAAKFESNFNTQATNRNTDGSTDYGILQINSRWWCNDGRT"
     "PGSRNLCNIPCSALLSSDITASVNCAKKIVSDGNGMNAWVAWRNRCKGTDVQAWIRGCRL"
@@ -371,23 +377,45 @@ with tab_generate:
                      "simply be unreachable for a given model).",
             ))
         with col_b:
-            threshold = st.slider(
-                "Interaction score threshold", min_value=0.50, max_value=0.99, value=0.80, step=0.01,
-                help="Same threshold as inference.test_interaction: a candidate is kept only if "
-                     "the Siamese classifier's sigmoid score exceeds this value.",
-            )
-        with col_c:
+            # The model is chosen BEFORE the threshold on purpose: the usable
+            # threshold depends on the chosen model's score calibration, so the
+            # slider below reads that model's recorded score range.
             # Weights are stored per encoding window, so the only windows that
             # can actually be run are the ones that have been trained. List
             # those instead of a free-form length that silently falls back to
             # simulated results.
             trained_sizes = real_pipeline.trained_vector_sizes()
             if trained_sizes:
+                # Default to a window whose classifier shipped a calibration
+                # file, in preference to the historical 200 aa default. An
+                # uncalibrated model is the case where a threshold cannot be
+                # checked against anything, which is how a run ends up
+                # returning nothing for no visible reason.
+                calibrated_sizes = [
+                    size for size in trained_sizes
+                    if real_pipeline.score_calibration(size)
+                ]
+                if calibrated_sizes:
+                    # Best measured model, not the widest window. A wider
+                    # encoding window is not automatically better: most of a
+                    # 400 aa tensor is padding for a ~218 aa antibody chain,
+                    # and the 250 aa pair scores higher on held-out data.
+                    default_size = max(
+                        calibrated_sizes,
+                        key=lambda size: real_pipeline.score_calibration(size).get("roc_auc", 0),
+                    )
+                elif VECTOR_SIZE in trained_sizes:
+                    default_size = VECTOR_SIZE
+                else:
+                    default_size = trained_sizes[0]
                 vector_size = int(st.selectbox(
                     "Trained model (sequence length)",
                     options=trained_sizes,
-                    index=trained_sizes.index(VECTOR_SIZE) if VECTOR_SIZE in trained_sizes else 0,
-                    format_func=lambda size: f"{size} aa window",
+                    index=trained_sizes.index(default_size),
+                    format_func=lambda size: (
+                        f"{size} aa window"
+                        + ("" if real_pipeline.score_calibration(size) else " (uncalibrated)")
+                    ),
                     help="The one-hot encoding window (`vector_size`): the length of the "
                          "generated sequences and the input width of both models. Only windows "
                          "with a complete set of trained VAE + Siamese weights under "
@@ -403,6 +431,58 @@ with tab_generate:
                          "(`--vector-size <length>`), this control becomes a list of the "
                          "trained windows.",
                 ))
+        with col_c:
+            # A threshold the trained classifier can never reach is the single
+            # most confusing failure this dashboard can produce: sampling runs
+            # its whole budget and returns nothing, with no indication that no
+            # amount of sampling would have helped. If the model shipped a
+            # calibration file, default to its recommended operating point and
+            # cap the slider just above the highest score it has ever produced.
+            calibration = real_pipeline.score_calibration(vector_size)
+            if calibration:
+                reachable_max = float(calibration["score_max"])
+                # The selection threshold, not Youden's balanced one: picking
+                # candidates out of an unlimited sampling pool should favour
+                # precision, since sampling can always draw more.
+                suggested = float(
+                    calibration.get("selection_threshold")
+                    or calibration["recommended_threshold"]
+                )
+                slider_max = round(min(0.99, max(reachable_max, suggested + 0.01)), 2)
+                slider_min = round(min(0.50, suggested - 0.05), 2)
+                threshold = st.slider(
+                    "Interaction score threshold",
+                    min_value=slider_min, max_value=slider_max,
+                    value=round(min(max(suggested, slider_min), slider_max), 2), step=0.01,
+                    help="Same threshold as inference.test_interaction: a candidate is kept only "
+                         "if the Siamese classifier's score reaches this value. The range of this "
+                         "slider is the range this model actually produces on held-out pairs "
+                         f"({calibration['score_min']:.2f}-{reachable_max:.2f}), so it cannot be "
+                         "set to a value no candidate could ever reach.",
+                )
+                precision = calibration.get("selection_precision")
+                st.caption(
+                    f"Suggested {suggested:.2f}"
+                    + (f" — about {precision:.0%} of candidates kept at this score really interact."
+                       if precision else ".")
+                )
+                if threshold > reachable_max:
+                    st.warning(
+                        f"No held-out pair scored above {reachable_max:.2f} with this model — "
+                        "a run at this threshold will very likely return nothing."
+                    )
+            else:
+                threshold = st.slider(
+                    "Interaction score threshold", min_value=0.50, max_value=0.99, value=0.80,
+                    step=0.01,
+                    help="Same threshold as inference.test_interaction: a candidate is kept only "
+                         "if the Siamese classifier's score reaches this value. No calibration "
+                         "file was found for this model (`run/models/siamese/"
+                         "one-hot-<size>-calibration.json`), so there is no record of the score "
+                         "range it can actually produce -- retrain with "
+                         "`scripts/train_siamese.py` to get one.",
+                )
+                st.caption("⚠️ Uncalibrated model — 0.80 may be unreachable.")
 
         temperature = st.slider(
             "Sampling temperature", min_value=0.2, max_value=2.0, value=1.0, step=0.1,
@@ -417,10 +497,11 @@ with tab_generate:
         elif temperature > 1.4:
             st.caption("🟠 Exploratory sampling — expect more diverse but less confident decodes.")
 
+        use_real_hint = real_pipeline.models_available(vector_size)
         with st.expander("Encoding & sampling-budget settings"):
             st.caption(
                 f"One-hot encoding · {vector_size} aa window · {ALPHABET_SIZE}-letter alphabet · "
-                "VAE latent dim 2 · Siamese CNN+GRU classifier "
+                "VAE latent sampling · Siamese CNN+GRU classifier "
                 "(see intelligent_antibodies/modules/models/)"
             )
             max_attempts = int(st.number_input(
@@ -433,6 +514,33 @@ with tab_generate:
                      "waiting through many unproductive batches. Each real-model batch samples "
                      "10 candidates and costs roughly half a second.",
             ))
+            chain_types = real_pipeline.available_chain_types(vector_size) if use_real_hint else []
+            chain_choice = "any"
+            if chain_types:
+                chain_choice = st.radio(
+                    "Chain type",
+                    options=["any"] + chain_types,
+                    horizontal=True,
+                    format_func=lambda c: {"any": "Either", "heavy": "Heavy only",
+                                           "light": "Light only"}.get(c, c),
+                    help="An antibody pairs one heavy and one light chain, and the generator was "
+                         "trained on both without being told which is which. It separates them "
+                         "anyway, so sampling can be restricted to one family's region of the "
+                         "latent space. 'Either' samples the whole space and returns a mixture.",
+                )
+            residue_temperature = float(st.slider(
+                "Residue sampling diversity", min_value=0.0, max_value=1.5, value=0.0, step=0.1,
+                help="0.0 decodes each position greedily (argmax), which is what generation has "
+                     "always done -- nearby latent points then decode to the SAME sequence, so a "
+                     "large pool can contain only a handful of distinct candidates. Above 0, each "
+                     "position is sampled from the decoder's own distribution at this "
+                     "temperature, which buys distinct candidates at some cost in decode fidelity. "
+                     "Only applies to real trained models.",
+            ))
+            if residue_temperature > 0:
+                st.caption(
+                    "🟠 Per-residue sampling on — more distinct candidates, lower decode confidence."
+                )
 
         use_real = real_pipeline.models_available(vector_size)
         if use_real:
@@ -479,10 +587,17 @@ with tab_generate:
             generate = (
                 real_pipeline.generate_candidates_real if use_real else generate_candidates_mock
             )
+            # Per-residue sampling exists only in the real decoder; the mock
+            # has no decoder distribution to sample from.
+            extra = (
+                {"residue_temperature": residue_temperature,
+                 "chain_type": None if chain_choice == "any" else chain_choice}
+                if use_real else {}
+            )
             run = generate(
                 sequence, n_requested=n_requested, threshold=threshold,
                 temperature=temperature, vector_size=vector_size,
-                max_batches=max_attempts, progress=report_progress,
+                max_batches=max_attempts, progress=report_progress, **extra,
             )
             progress.empty()
             st.session_state["run"] = run
@@ -493,13 +608,37 @@ with tab_generate:
                     "See the **Results** tab."
                 )
             else:
-                st.warning(
+                # The old message listed three remedies without saying which
+                # one applied, and in the common case ("the classifier cannot
+                # score this high at all") none of them could work. Lead with
+                # the best score actually achieved and, where the model is
+                # calibrated, name the threshold that would have worked.
+                best = run.best_score
+                lines = [
                     f"Sampling budget spent after {run.batches_run} batches "
                     f"({run.n_pool_generated} candidates sampled): only {run.n_passed} of the "
-                    f"{run.n_requested} requested cleared the {run.threshold:.2f} threshold. "
-                    "Lower the threshold, raise the sampling temperature, or ask for fewer "
-                    "candidates. Results so far are in the **Results** tab."
-                )
+                    f"{run.n_requested} requested reached the {run.threshold:.2f} threshold."
+                ]
+                if run.n_pool_generated:
+                    lines.append(f"Best score in the pool: **{best:.3f}**.")
+                cal = run.calibration
+                if cal and run.threshold > float(cal["score_max"]):
+                    lines.append(
+                        f"This model's scores never exceed **{float(cal['score_max']):.2f}** on "
+                        f"held-out pairs, so a {run.threshold:.2f} threshold is unreachable by "
+                        f"construction — no amount of sampling would help. Try "
+                        f"**{float(cal['recommended_threshold']):.2f}** (its calibrated operating "
+                        "point)."
+                    )
+                elif run.n_pool_generated and best == best:  # not NaN
+                    suggestion = max(0.50, round(best - 0.02, 2))
+                    lines.append(
+                        f"A threshold of **{suggestion:.2f}** would have kept candidates from this "
+                        "pool. Raising **Residue sampling diversity** also helps when the pool "
+                        "holds few distinct sequences."
+                    )
+                lines.append("The full sampled pool is in the **Results** tab.")
+                st.warning(" ".join(lines))
 
 # --------------------------------------------------------------------------
 # Results tab
@@ -544,10 +683,45 @@ with tab_results:
 
         if df.empty:
             st.warning(
-                "No candidates cleared the interaction threshold. Try lowering the "
-                "threshold, raising the temperature, or requesting more candidates "
-                "in the Generate tab."
+                f"No candidate reached the {run.threshold:.2f} threshold. The "
+                f"{run.n_pool_generated} sampled candidates are listed below, best first — the "
+                "run is not lost, it just has nothing above the cut."
             )
+            if not pool.empty:
+                # Showing the near-misses is the whole point: an empty table
+                # gave no way to tell "the model scores everything at 0.55"
+                # (threshold too high) from "the decoder emits junk".
+                best_of_pool = (
+                    pool.sort_values("interaction_score", ascending=False)
+                    .drop_duplicates(subset="sequence")
+                    .head(max(run.n_requested, 10))
+                    .reset_index(drop=True)
+                )
+                st.caption(
+                    f"{len(pool)} sampled · {pool['sequence'].nunique()} distinct · "
+                    f"scores {pool['interaction_score'].min():.3f}–"
+                    f"{pool['interaction_score'].max():.3f}"
+                )
+                st.dataframe(
+                    best_of_pool[["sequence", "length", "interaction_score", "decode_confidence"]],
+                    use_container_width=True, hide_index=True,
+                    column_config={
+                        "interaction_score": st.column_config.NumberColumn(
+                            "Interaction score", format="%.3f",
+                            help="Below the threshold set for this run.",
+                        ),
+                        "decode_confidence": st.column_config.NumberColumn(
+                            "Decode confidence", format="%.3f"
+                        ),
+                    },
+                )
+                if pool["sequence"].nunique() < 5 and len(pool) > 20:
+                    st.info(
+                        f"Only {pool['sequence'].nunique()} distinct sequence(s) in "
+                        f"{len(pool)} samples — the decoder is collapsing to the same output. "
+                        "Raise **Residue sampling diversity** in the Generate tab, and retrain "
+                        "the VAE with a wider `--latent-dim` for lasting diversity."
+                    )
         else:
             sub_overview, sub_latent, sub_seqs, sub_explorer = st.tabs(
                 ["Overview", "Latent space", "Sequence analysis", "Candidate explorer"]
@@ -949,25 +1123,110 @@ with tab_results:
                     "Full AlphaFold2 needs a multi-gigabyte sequence-database search and a GPU "
                     "cluster, neither available here. **ESMFold** is a real, single-sequence "
                     "structure predictor from the same line of research, often used as a practical "
-                    "AlphaFold stand-in — this calls the free public ESM Atlas API over the "
-                    "internet, so it needs a connection and can take up to ~a minute."
+                    "AlphaFold stand-in. Folding tries each configured provider in turn, so a "
+                    "single service being down no longer kills the feature."
                 )
+
+                # Provider status up front. The free ESM Atlas API goes down
+                # from time to time, and when it does it fails at every
+                # sequence length -- worth knowing before waiting on a click.
+                provider_rows = structure_prediction.provider_status()
+                down = [r for r in provider_rows if r["recent_failure"]]
+                ready = [r for r in provider_rows if r["configured"] == "yes" and not r["recent_failure"]]
+                with st.expander(
+                    f"Folding providers — {len(ready)} ready"
+                    + (f", {len(down)} recently failed" if down else ""),
+                    expanded=bool(down) and not ready,
+                ):
+                    for row in provider_rows:
+                        limit = f" · up to {row['max_length']} aa"
+                        if row["recent_failure"]:
+                            st.markdown(f"- ❌ **{row['label']}**{limit} — {row['recent_failure']}")
+                        elif row["configured"] == "yes":
+                            st.markdown(f"- ✅ **{row['label']}**{limit} — ready")
+                        else:
+                            st.markdown(f"- ⚪ **{row['label']}**{limit} — not set up ({row['needs']})")
+                    if not any(r["name"] == "nvidia" and r["configured"] == "yes" for r in provider_rows):
+                        st.caption(
+                            "The free ESM Atlas API cuts every request off at ~29s, which a "
+                            "full-length antibody chain often cannot beat. For a path without "
+                            "that limit, get a free key at "
+                            "[build.nvidia.com/nvidia/esmfold](https://build.nvidia.com/nvidia/esmfold) "
+                            "and start the dashboard with `NVIDIA_API_KEY=nvapi-... uv run "
+                            "streamlit run app/main.py` — it accepts up to 1024 aa and is "
+                            "picked ahead of ESM Atlas automatically."
+                        )
+                    if down and st.button("↻ Retry the failed provider(s) now", key=f"reset_{selected['candidate_id']}"):
+                        structure_prediction.reset_outage_memo()
+                        st.rerun()
+
                 fold_key = f"fold_{selected['candidate_id']}"
                 if st.button("🔬 Fold with ESMFold", key=f"btn_{fold_key}"):
                     st.session_state[fold_key] = "requested"
 
-                if st.session_state.get(fold_key) == "requested":
+                request = st.session_state.get(fold_key)
+                if isinstance(request, str) and request.startswith("requested"):
+                    # "requested" folds the whole candidate; "requested:N" folds
+                    # its first N residues. The public API's ~29s gateway limit
+                    # is the reason the second option exists -- see below.
+                    _, _, limit = request.partition(":")
+                    sequence_to_fold = (
+                        selected["sequence"][: int(limit)] if limit else selected["sequence"]
+                    )
                     try:
                         with st.spinner(
-                            "Calling the ESMFold API (usually ~30-60s; this free public API can "
-                            "be overloaded, so a slow or busy response is retried automatically "
-                            "-- worst case ~2 min)..."
+                            f"Folding {len(sequence_to_fold)} residues (a reachable provider "
+                            "usually answers in ~30-60s; one that is down fails fast and the "
+                            "next is tried)..."
                         ):
-                            fold_result = structure_prediction.fold_sequence(selected["sequence"])
+                            fold_result = structure_prediction.fold_sequence(sequence_to_fold)
                     except structure_prediction.FoldingError as exc:
                         st.error(f"Could not get a real fold: {exc}")
+                        # An antibody's binding site sits in the variable
+                        # domain -- roughly the first 110-130 residues of a
+                        # chain. Folding just that is both cheap enough to
+                        # beat the gateway timeout and the part anyone would
+                        # actually look at, so offer it rather than leaving a
+                        # dead end.
+                        if not limit and len(selected["sequence"]) > FV_DOMAIN_LENGTH + 20:
+                            if st.button(
+                                f"🧬 Try folding just the variable domain "
+                                f"(first {FV_DOMAIN_LENGTH} aa)",
+                                key=f"fv_{fold_key}",
+                            ):
+                                st.session_state[fold_key] = f"requested:{FV_DOMAIN_LENGTH}"
+                                st.rerun()
+                            st.caption(
+                                f"This candidate is {len(selected['sequence'])} aa. The free API "
+                                "cuts requests off at ~29s, which a full-length chain often "
+                                "exceeds. The variable domain carries the binding site (the "
+                                "CDR loops), folds well inside the limit, and is the region "
+                                "worth inspecting."
+                            )
+                        # Also hand over the sequence so it can be folded elsewhere.
+                        st.download_button(
+                            "⬇️ Download this candidate as FASTA",
+                            data=f">{selected['candidate_id']} score={selected['interaction_score']:.3f}\n"
+                                 f"{selected['sequence']}\n",
+                            file_name=f"{selected['candidate_id']}.fasta",
+                            mime="text/plain",
+                            key=f"dl_{fold_key}",
+                        )
+                        st.caption(
+                            "You can fold it with any ESMFold instance — for example the "
+                            "[ESMFold notebook on Colab]"
+                            "(https://colab.research.google.com/github/sokrypton/ColabFold/blob/main/ESMFold.ipynb)"
+                            " — or set up one of the fallback providers listed above."
+                        )
+                        if st.session_state.get(fold_key) == request:
+                            st.session_state.pop(fold_key, None)
                     else:
                         st.session_state[fold_key] = fold_result
+                        if limit:
+                            st.info(
+                                f"Folded the first {len(sequence_to_fold)} of "
+                                f"{len(selected['sequence'])} residues (variable domain)."
+                            )
 
                 fold_state = st.session_state.get(fold_key)
                 if isinstance(fold_state, structure_prediction.FoldResult):
@@ -987,6 +1246,7 @@ with tab_results:
                     plddt_cols[1].metric("Min pLDDT", f"{min(fold_result.per_residue_plddt):.1f}")
                     plddt_cols[2].metric("Max pLDDT", f"{max(fold_result.per_residue_plddt):.1f}")
                     plddt_cols[3].metric("Residues folded", len(fold_result.per_residue_plddt))
+                    st.caption(f"Structure predicted by: `{fold_result.provider}`")
 
         if st.button("🗑️ Clear results"):
             del st.session_state["run"]
@@ -1101,6 +1361,33 @@ with tab_data:
         "MCC = (TP·TN − FP·FN) / √((TP+FP)(TP+FN)(TN+FP)(TN+FN))"
     )
 
+    # Measured quality of the trained classifier, if it was trained with
+    # calibration enabled. This is the number that decides whether generation
+    # can ever meet a given threshold, so it belongs on the model tab rather
+    # than only in the training script's stdout.
+    calibrated = {
+        size: real_pipeline.score_calibration(size)
+        for size in real_pipeline.trained_vector_sizes()
+    }
+    calibrated = {size: cal for size, cal in calibrated.items() if cal}
+    if calibrated:
+        # Deliberately brief: two numbers that tell a user whether to trust a
+        # result, not a training report. The full picture (every operating
+        # point, the tuned decision thresholds) stays in the calibration JSON
+        # and in the training script's own output, where it belongs.
+        st.markdown("**Model quality**")
+        for size, cal in calibrated.items():
+            cols = st.columns(2)
+            cols[0].metric(f"ROC AUC · {size} aa", f"{cal['roc_auc']:.2f}",
+                           help="0.5 = no better than chance, 1.0 = perfect separation. "
+                                "Measured on held-out pairs sharing no antibody with training.")
+            precision = cal.get("selection_precision")
+            cols[1].metric(
+                "Precision at the suggested threshold",
+                f"{precision:.0%}" if precision else "—",
+                help="Share of kept candidates that really interact, on held-out pairs.",
+            )
+
     plot_files = {
         "Siamese — training curve": "Siamese_training_curve.png",
         "Siamese — training metrics": "Siamese_training_metrics.png",
@@ -1113,11 +1400,13 @@ with tab_data:
         if (REPO_ROOT / "plots" / fname).exists()
     }
     if existing_plots:
-        st.markdown("**Training diagnostics** (captured from prior runs, see `plots/`)")
-        plot_cols = st.columns(2)
-        for i, (label, path) in enumerate(existing_plots.items()):
-            with plot_cols[i % 2]:
-                st.image(str(path), caption=label, width="stretch")
+        # Tucked into an expander: training curves are for whoever trained the
+        # model, not for someone here to generate candidates.
+        with st.expander("Training curves", expanded=False):
+            plot_cols = st.columns(2)
+            for i, (label, path) in enumerate(existing_plots.items()):
+                with plot_cols[i % 2]:
+                    st.image(str(path), caption=label, width="stretch")
 
 # --------------------------------------------------------------------------
 # About tab
