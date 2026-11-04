@@ -3,7 +3,6 @@ from typing import List, Tuple, Any
 
 import numpy as np
 import pandas as pd
-import matplotlib.pyplot as plt
 
 from intelligent_antibodies.modules.utils import encoding
 from intelligent_antibodies.modules.utils.paths import SABDAB_DIR

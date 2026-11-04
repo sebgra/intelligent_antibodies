@@ -6,6 +6,9 @@
 #   * no torch -- it is only needed for the optional local ESMFold provider,
 #     which cannot run within a hosted app's memory budget anyway.
 #   * no biopython/tqdm -- used by the data-preparation scripts, not the app.
+#   * matplotlib IS required even though the dashboard draws with plotly:
+#     keras imports matplotlib.pyplot itself (keras.src.visualization), so
+#     dropping it breaks the app on startup.
 #
 # For local development use `uv sync`, which reads pyproject.toml instead.
 streamlit>=1.40.0
