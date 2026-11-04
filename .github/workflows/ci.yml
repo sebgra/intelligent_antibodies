@@ -1,0 +1,158 @@
+name: CI
+
+# Streamlit Community Cloud redeploys automatically on every push to `main`,
+# which means a broken commit reaches the live app before anyone notices. This
+# workflow is the guard: it builds the HOSTED dependency set from scratch and
+# exercises the app the way the host will, so the failures that only appear
+# off this machine are caught here instead of in production.
+#
+# Two real examples it would have caught:
+#   * keras imports matplotlib.pyplot internally, so dropping matplotlib from
+#     requirements.txt works locally and kills the app on startup;
+#   * a dead PyTorch layer re-exported from modules.layers made torch a hard
+#     import -- fine locally, absent on the host.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  deployment-stack:
+    name: Hosted dependency set
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: requirements.txt
+
+      - name: Install the hosted requirements, not the dev ones
+        run: |
+          python -m pip install --upgrade pip
+          # requirements.txt is what Streamlit Community Cloud reads. Installing
+          # pyproject.toml here instead would test a stack nobody deploys.
+          pip install -r requirements.txt
+
+      - name: Report the resolved stack
+        run: |
+          python - <<'PY'
+          import importlib.metadata as md
+          for pkg in ("streamlit", "tensorflow-cpu", "keras", "numpy", "pandas",
+                      "plotly", "scikit-learn", "matplotlib", "requests"):
+              try:
+                  print(f"{pkg}=={md.version(pkg)}")
+              except md.PackageNotFoundError:
+                  print(f"{pkg}: NOT INSTALLED")
+          PY
+
+      - name: torch must stay optional
+        run: |
+          # The dashboard must import without torch. It is ~900 MB and is only
+          # needed for the optional local ESMFold provider.
+          python - <<'PY'
+          import importlib.util, sys
+          assert importlib.util.find_spec("torch") is None, \
+              "torch is installed in the hosted set; it should not be"
+          sys.path.insert(0, "app")
+          import real_pipeline  # noqa: F401
+          assert "torch" not in sys.modules, "importing the app pulled in torch"
+          print("app imports cleanly without torch")
+          PY
+        env:
+          PYTHONPATH: ${{ github.workspace }}
+
+      - name: Model self-checks
+        run: |
+          python -m intelligent_antibodies.modules.models.VAEFull
+          python -m intelligent_antibodies.modules.models.SiameseInteractionClassifier
+        env:
+          PYTHONPATH: ${{ github.workspace }}
+
+      - name: The committed weights load and generate
+        run: |
+          # The repo ships the 250 aa pair so a deployment works without
+          # training. If they stop loading -- a Keras version bump, a changed
+          # layer -- the live app silently falls back to simulated results.
+          python - <<'PY'
+          import sys
+          sys.path.insert(0, "app")
+          import real_pipeline as rp
+
+          assert rp.models_available(250), "the committed 250 aa weights did not load"
+          calibration = rp.score_calibration(250)
+          assert calibration, "no calibration file for the 250 aa model"
+          threshold = calibration["selection_threshold"]
+
+          antigen = ("KVFGRCELAAAMKRHGLANYRGYSLGNWVCAAKFESNFNTQATNRNTDGSTDYGILQINSRWWCNDGRT"
+                     "PGSRNLCNIPCSALLSSDITASVNCAKKIVSDGNGMNAWVAWRNRCKGTDVQAWIRGCRL")
+          run = rp.generate_candidates_real(
+              antigen, n_requested=3, threshold=threshold, temperature=1.0,
+              vector_size=250, max_batches=40, max_seconds=420,
+          )
+          assert run.n_passed >= 1, (
+              f"no candidate reached the calibrated threshold {threshold} "
+              f"in {run.batches_run} batches"
+          )
+          print(f"AUC {calibration['roc_auc']} | cut {threshold} | "
+                f"{run.n_passed} found in {run.batches_run} batches")
+          print("best:", run.candidates["sequence"].iloc[0][:60])
+          PY
+        env:
+          PYTHONPATH: ${{ github.workspace }}
+
+      - name: Chain-type conditioning
+        run: |
+          python - <<'PY'
+          import sys
+          sys.path.insert(0, "app")
+          import real_pipeline as rp
+          from intelligent_antibodies.modules.utils.chains import classify_chain
+
+          assert set(rp.available_chain_types(250)) >= {"heavy", "light"}, \
+              "the latent stats carry no per-chain-type centres"
+
+          antigen = ("KVFGRCELAAAMKRHGLANYRGYSLGNWVCAAKFESNFNTQATNRNTDGSTDYGILQINSRWWCNDGRT"
+                     "PGSRNLCNIPCSALLSSDITASVNCAKKIVSDGNGMNAWVAWRNRCKGTDVQAWIRGCRL")
+          run = rp.generate_candidates_real(
+              antigen, n_requested=8, threshold=0.5, temperature=1.0,
+              vector_size=250, max_batches=20, max_seconds=420, chain_type="heavy",
+          )
+          kinds = [classify_chain(s) for s in run.pool["sequence"]]
+          heavy, light = kinds.count("heavy"), kinds.count("light")
+          # Conditioning is statistical, not a guarantee; this only asserts the
+          # requested family dominates, which a broken centre would not do.
+          assert heavy > light, f"asked for heavy, got {heavy} heavy / {light} light"
+          print(f"heavy-conditioned pool: {heavy} heavy / {light} light")
+          PY
+        env:
+          PYTHONPATH: ${{ github.workspace }}
+
+      - name: The dashboard renders
+        run: |
+          python - <<'PY'
+          import sys
+          sys.path.insert(0, "app")
+          from streamlit.testing.v1 import AppTest
+
+          app = AppTest.from_file("app/main.py", default_timeout=600)
+          app.run()
+          assert not app.exception, [str(e.value)[:400] for e in app.exception]
+
+          sizes = [box.value for box in app.selectbox if "Trained model" in box.label]
+          assert 250 in sizes, f"the 250 aa model is not offered: {sizes}"
+          print(f"dashboard renders; model in use: {sizes}")
+          PY
+        env:
+          PYTHONPATH: ${{ github.workspace }}
