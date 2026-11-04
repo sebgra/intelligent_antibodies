@@ -1,0 +1,19 @@
+# Dependencies for a hosted deployment (Streamlit Community Cloud reads this
+# file). Deliberately not the same set as pyproject.toml:
+#
+#   * tensorflow-cpu, not tensorflow -- the GPU build pulls ~4 GB of CUDA
+#     libraries that a CPU-only host cannot use and has no room for.
+#   * no torch -- it is only needed for the optional local ESMFold provider,
+#     which cannot run within a hosted app's memory budget anyway.
+#   * no biopython/tqdm -- used by the data-preparation scripts, not the app.
+#
+# For local development use `uv sync`, which reads pyproject.toml instead.
+streamlit>=1.40.0
+tensorflow-cpu>=2.21.0
+keras>=3.13.2
+numpy>=2.4.3
+pandas<3
+plotly>=7.1.0
+scikit-learn>=1.8.0
+matplotlib>=3.10.8
+requests>=2.32

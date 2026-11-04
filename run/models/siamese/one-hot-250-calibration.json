@@ -1,0 +1,78 @@
+{
+  "vector_size": 250,
+  "n_test_pairs": 1586,
+  "roc_auc": 0.7595,
+  "average_precision": 0.7367,
+  "score_min": 0.0,
+  "score_max": 1.0,
+  "score_mean": 0.4313,
+  "score_std": 0.4022,
+  "percentiles": {
+    "1": 0.0001,
+    "5": 0.001,
+    "25": 0.0301,
+    "50": 0.2908,
+    "75": 0.9115,
+    "90": 0.9902,
+    "95": 0.997,
+    "99": 0.9995
+  },
+  "decision": {
+    "at_0.5": {
+      "threshold": 0.5,
+      "mcc": 0.3825,
+      "f1": 0.6523,
+      "precision": 0.6741,
+      "recall": 0.6318
+    },
+    "tuned_for_mcc": {
+      "threshold": 0.3954,
+      "mcc": 0.3809,
+      "f1": 0.6625,
+      "precision": 0.6584,
+      "recall": 0.6667
+    },
+    "tuned_for_f1": {
+      "threshold": 0.1727,
+      "mcc": 0.3532,
+      "f1": 0.6741,
+      "precision": 0.6056,
+      "recall": 0.7601
+    }
+  },
+  "mcc_threshold": 0.3954,
+  "f1_threshold": 0.1727,
+  "recommended_threshold": 0.5889,
+  "selection_threshold": 0.9115,
+  "selection_precision": 0.7809,
+  "recommended_precision": 0.7006,
+  "positive_score_mean": 0.6247,
+  "negative_score_mean": 0.2717,
+  "operating_points": [
+    {
+      "threshold": 0.2908,
+      "kept_fraction": 0.5,
+      "precision": 0.6393
+    },
+    {
+      "threshold": 0.9115,
+      "kept_fraction": 0.2503,
+      "precision": 0.7809
+    },
+    {
+      "threshold": 0.9902,
+      "kept_fraction": 0.1003,
+      "precision": 0.8805
+    },
+    {
+      "threshold": 0.997,
+      "kept_fraction": 0.0504,
+      "precision": 0.9125
+    },
+    {
+      "threshold": 0.9995,
+      "kept_fraction": 0.0101,
+      "precision": 1.0
+    }
+  ]
+}

@@ -1,0 +1,13 @@
+[theme]
+primaryColor = "#008080"
+backgroundColor = "#fcfcfb"
+secondaryBackgroundColor = "#f0efec"
+textColor = "#0b0b0b"
+
+[server]
+# Candidate generation holds the connection while it samples and scores in
+# batches; the default 200 MB upload cap is far more than a FASTA file needs.
+maxUploadSize = 5
+
+[browser]
+gatherUsageStats = false

@@ -262,6 +262,42 @@ A full-length antibody chain often cannot beat ESM Atlas's 29 s limit (measured:
 
 ---
 
+## Deploying the dashboard
+
+The repository ships the trained **250 aa** model pair (25 MB), so a deployment works immediately — no training step, no weight download.
+
+### Streamlit Community Cloud
+
+1. Push this repo to GitHub.
+2. Go to [share.streamlit.io](https://share.streamlit.io) → **New app**, and point it at:
+   - **Repository:** `sebgra/intelligent_antibodies`
+   - **Branch:** `main`
+   - **Main file path:** `app/main.py`
+3. Deploy. The build reads `requirements.txt` (not `pyproject.toml`).
+
+Optionally, under **Advanced settings → Secrets**, add a folding API key:
+
+```toml
+NVIDIA_API_KEY = "nvapi-..."
+```
+
+### Why the hosted dependency list differs
+
+`requirements.txt` is deliberately not `pyproject.toml`:
+
+| Local (`uv sync`) | Hosted (`requirements.txt`) | Why |
+|---|---|---|
+| `tensorflow` | `tensorflow-cpu` | The GPU build pulls ~4 GB of CUDA libraries a CPU-only host cannot use |
+| `torch` | *omitted* | Only needed for the optional local ESMFold provider, which will not fit in a hosted app's memory |
+| `biopython`, `tqdm` | *omitted* | Used by the data-preparation scripts, not by the app |
+
+### A note on Vercel
+
+Vercel is not a fit for this app, despite now supporting [Python functions up to 5 GB](https://vercel.com/changelog/websocket-support-is-now-available-for-python-functions) and WebSockets. Streamlit is not an ASGI/WSGI application — it runs its own Tornado server and expects a persistent process — and Vercel pins each WebSocket to the function's maximum duration, then closes it. A Vercel deployment would need the app layer rewritten as a FastAPI service with a separate frontend.
+
+
+---
+
 ## Project structure
 
 ```

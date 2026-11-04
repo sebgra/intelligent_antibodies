@@ -1,4 +1,26 @@
-run
+# Local run artefacts. Git cannot re-include a file whose parent directory is
+# excluded, so each level is opened explicitly before the exceptions below.
+/run/*
+!/run/models/
+/run/models/*
+!/run/models/vae/
+!/run/models/siamese/
+/run/models/vae/*
+/run/models/siamese/*
+
+# ...except the 250 aa pair the hosted dashboard loads. 25 MB in total,
+# largest file 13 MB, so a clone or a Streamlit Cloud deployment works without
+# retraining first. Every other trained window stays local.
+!/run/models/vae/vae-one-hot-250-encoder.keras
+!/run/models/vae/vae-one-hot-250-decoder.keras
+!/run/models/vae/vae-one-hot-250-latent-stats.json
+!/run/models/siamese/one-hot-250-model.h5
+!/run/models/siamese/one-hot-250-calibration.json
+
+# Stale run directories from earlier experiments elsewhere in the tree.
+intelligent_antibodies/run/
+notebooks/run/
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
